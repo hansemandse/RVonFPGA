@@ -12,7 +12,7 @@
 --              : components. std_logic_vectors are used along with local type conversions
 --              : whenever necessary.
 --              |
--- Revision     : 1.3   (last updated February 2, 2019)
+-- Revision     : 1.4   (last updated February 6, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -24,17 +24,17 @@ use work.types.all;
 
 entity IDEX_register is
     port (
-        clk, reset, flush : in std_logic;
+        clk, reset : in std_logic;
         -- Control signal inputs
             -- FILL IN HERE
         -- Data signal inputs
-        pc_in : in std_logic_vector(PC_WIDTH-1 downto 0);
+        sreg_1_in, sreg_2_in, dreg_in : in std_logic_vector(ADDR_WIDTH-1 downto 0);
         data_1_in, data_2_in : in doubleword;
         imm_in : in doubleword;
         -- Control signal outputs
             -- FILL IN HERE
         -- Data signal outputs
-        pc_out : out std_logic_vector(PC_WIDTH-1 downto 0);
+        sreg_1_out, sreg_2_out, dreg_out : out std_logic_vector(ADDR_WIDTH-1 downto 0);
         data_1_out, data_2_out : out doubleword;
         imm_out : out doubleword
     );
@@ -48,10 +48,10 @@ begin
         if (rising_edge(clk)) then
             if (reset = '1') then
                 -- FILL IN HERE
-            elsif (flush = '1') then
-                -- INSERT NOP HERE
             else
-                pc_out <= pc_in;
+                sreg_1_out <= sreg_1_in;
+                sreg_2_out <= sreg_2_in;
+                dreg_out <= dreg_in;
                 data_1_out <= data_1_in;
                 data_2_out <= data_2_in;
                 imm_out <= imm_in;

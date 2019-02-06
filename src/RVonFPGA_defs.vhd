@@ -58,6 +58,10 @@ package defs is
     type alu_op_t is (ALU_AND, ALU_OR, ALU_XOR, ALU_ADD, ALU_SUB, ALU_SLT, ALU_SLTU,
                       ALU_SLL, ALU_SRL, ALU_SRA, ALU_NOP, ALU_ADDW, ALU_SUBW, ALU_SLLW, 
                       ALU_SRLW, ALU_SRAW);
+    type op1_t is (OP1_ID, OP1_MEM, OP1_WB);
+    type op2_t is (OP2_ID, OP2_IMM, OP2_MEM, OP2_WB);
+    -- Update locations for the PC
+    type pc_source is (PC_INC, PC_BRC); -- May add exception handler
 end defs;
 
 package body defs is

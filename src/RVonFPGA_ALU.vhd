@@ -10,7 +10,7 @@
 --              : of Math and Computer Science.
 --              : This entity represents the ALU of the execution stage in the pipeline.
 --              |
--- Revision     : 1.1   (last updated February 2, 2019)
+-- Revision     : 1.2   (last updated February 6, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,8 +23,13 @@ use work.types.all;
 
 entity ALU is
     port (
+        -- Control inputs
+        sel_1 : in op1_t;
+        sel_2 : in op2_t;
         -- Input operands
-        a, b : in std_logic_vector(DATA_WIDTH-1 downto 0);
+        a_ID, a_MEM, a_WB : in std_logic_vector(DATA_WIDTH-1 downto 0); 
+        b_ID, b_MEM, b_WB : in std_logic_vector(DATA_WIDTH-1 downto 0);
+        immediate : in std_logic_vector(DATA_WIDTH-1 downto 0);
         alu_op : in alu_op_t;
         -- Outputs
         result : out std_logic_vector(DATA_WIDTH-1 downto 0);
@@ -34,8 +39,21 @@ end ALU;
 
 architecture rtl of ALU is
     signal w_result_int : std_logic_vector(WORD_WIDTH-1 downto 0);
-    signal result_int : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal a, b, result_int : std_logic_vector(DATA_WIDTH-1 downto 0);
 begin
+    -- Selecting the two operands
+    with sel_1 select
+        a <= a_ID when OP1_ID,
+            a_MEM when OP1_MEM,
+            a_WB when others;
+    with sel_2 select
+        b <= b_ID when OP2_ID,
+            b_MEM when OP2_MEM,
+            b_WB when OP2_WB,
+            immediate when others;
+
+    -- Performing the calculations based on the operation type supplied by the ALU
+    -- controller (derived directly from the instruction)
     process (alu_op)
     begin
         w_result_int <= (others => '0');
@@ -92,6 +110,8 @@ begin
                 result_int <= (31 downto 0 => w_result_int, others => '0'); -- CHECK FOR SIGN-EXTENSION
             when others => -- NOP
         end case;
+
+        -- Checking if the result is zero and indicating the result to an output
         if (result_int = zero_doubleword) then
             zero <= '1';
         else
