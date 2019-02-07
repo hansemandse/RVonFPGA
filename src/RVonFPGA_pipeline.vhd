@@ -61,7 +61,7 @@ architecture rtl of pipeline is
 
     -- Declarations for the IFID register
     type IFID_t is record
-        pc : std_logic_vector(PC_WIDTH-1 downto 0);
+        PC : std_logic_vector(PC_WIDTH-1 downto 0);
         Instruction : std_logic_vector(31 downto 0);
     end record IFID_t;
     signal IFID, IFID_next : IFID_t;
@@ -117,14 +117,65 @@ architecture rtl of pipeline is
     -- Signals for the WB stage
     signal WriteData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
+    -- External pipeline components
+    component register_file is
+        generic (
+            DATA_WIDTH : integer := DATA_WIDTH;
+            ADDR_WIDTH : integer := 5;
+            ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH
+        );
+        port (
+            -- Control ports
+            RegWrite, clk, reset : in std_logic;
+            -- Read port 1
+            RegisterRs1 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            Data1 : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- Read port 2
+            RegisterRs2 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- Write port
+            RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
+        );
+    end component;
+
+    component instr_mem is
+        generic (
+            ADDR_WIDTH : integer := PC_WIDTH;
+            ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH
+        );
+        port (
+            -- Control ports
+            clk, reset : in std_logic;
+            -- Data port
+            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            Instruction : out std_logic_vector(31 downto 0)
+        );
+    end component;
+
+    component data_mem is
+        generic (
+            ADDR_WIDTH : integer := 12; -- Might need to be changed
+            ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH
+        );
+        port (
+            -- Control ports
+            MemRead, MemWrite, clk, reset : in std_logic;
+            -- Data ports
+            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            ReadData : out std_logic_vector(DATA_WIDTH-1 downto 0)
+        );
+    end component;
+
 begin
     -- Aliases for the ID stage
-    alias opcode : std_logic_vector(6 downto 0) is IFID.instr(6 downto 0);
-    alias rd : std_logic_vector(4 downto 0) is IFID.instr(11 downto 7);
-    alias funct3 : std_logic_vector(2 downto 0) is IFID.instr(14 downto 12);
-    alias rs1 : std_logic_vector(4 downto 0) is IFID.instr(19 downto 15);
-    alias rs2 : std_logic_vector(4 downto 0) is IFID.instr(24 downto 20);
-    alias funct7 : std_logic_vector(6 downto 0) is IFID.instr(31 downto 25);
+    alias opcode : std_logic_vector(6 downto 0) is IFID.Instruction(6 downto 0);
+    alias rd : std_logic_vector(4 downto 0) is IFID.Instruction(11 downto 7);
+    alias funct3 : std_logic_vector(2 downto 0) is IFID.Instruction(14 downto 12);
+    alias rs1 : std_logic_vector(4 downto 0) is IFID.Instruction(19 downto 15);
+    alias rs2 : std_logic_vector(4 downto 0) is IFID.Instruction(24 downto 20);
+    alias funct7 : std_logic_vector(6 downto 0) is IFID.Instruction(31 downto 25);
 
     PCSrc <= EXMEM.M.Branch and EXMEM.Zero;
 
@@ -144,9 +195,8 @@ begin
         else
             pc_next <= EXMEM.pc;
         end if;
-
-
-        -- Describing the immediate generator T
+        
+        -- Immediate generator
         -- The two least significant are "11" in all of the cases. Vivado should notice this 
         -- and synthesize the circuit such that the two bits are not used. They are only 
         -- written here for completeness.
@@ -205,13 +255,14 @@ begin
     begin
         if (rising_edge(clk)) then
             if (reset = '1') then
+                pc <= (others => '0');
                 -- FILL IN HERE
             else
                 pc <= pc_next;
                 IFID <= IFID_next;
                 IDEX <= IDEX_next;
                 EXMEM <= EXMEM_next;
-                MEMWB <= MEMWB;
+                MEMWB <= MEMWB_next;
             end if;
         end if;
     end process;
