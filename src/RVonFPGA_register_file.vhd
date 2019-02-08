@@ -7,11 +7,11 @@
 --              |
 -- Purpose      : This file is a part of a full system implemented as part of a bachelor's
 --              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Math and Computer Science.
+--              : of Mathematics and Computer Science.
 --              : This entity represents the register file in a classic RISC-V pipeline.
 --              : It has two read ports and one write port. 
 --              |
--- Revision     : 1.0   (last updated February 7, 2019)
+-- Revision     : 1.0   (last updated February 8, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
