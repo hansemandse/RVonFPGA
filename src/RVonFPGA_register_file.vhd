@@ -11,7 +11,7 @@
 --              : This entity represents the register file in a classic RISC-V pipeline.
 --              : It has two read ports and one write port. 
 --              |
--- Revision     : 1.0   (last updated February 8, 2019)
+-- Revision     : 1.0   (last updated February 9, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -44,7 +44,41 @@ end register_file;
 
 architecture rtl of register_file is
     type register_file_t is array(ARRAY_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal registers : register_file_t;
+    signal regs : register_file_t;
+    -- The following lines of code should force Vivado to implement this as distributed
+    -- RAM. However, Vivado claims that the memory is too sparse and therefore, they
+    -- are simply mapped to actual registers.
+    attribute ram_style : string;
+    attribute ram_style of regs : signal is "distributed";
 begin
-    -- FILL IN HERE
+    rf : process (all)
+    begin
+        -- Synchronous writes and resets
+        if (rising_edge(clk)) then
+            if (RegWrite = '1' and unsigned(RegisterRd) /= 0) then
+                -- Write data into the register file
+                regs(to_integer(unsigned(RegisterRd))) <= WriteData;
+            elsif (reset = '1') then
+                -- Reset the register file and set the stack pointer to 
+                -- the largest unsigned 12-bit number
+                regs <= (2 => (11 downto 0 => "1", others => '0'), others => (others => '0'));
+            end if;
+        end if;
+
+        -- Asynchronous reads with forwarding around the register file
+        if (RegisterRs1 = RegisterRd and RegWrite = '1') then
+            -- Forward data around the register file
+            Data1 <= WriteData;
+        else
+            -- Output data from the register file
+            Data1 <= regs(to_integer(unsigned(RegisterRs1)));
+        end if;
+        if (RegisterRs2 = RegisterRd and RegWrite = '1') then
+            -- Forward data around the register file
+            Data2 <= WriteData;
+        else
+            -- Output data from the register file
+            Data2 <= regs(to_integer(unsigned(RegisterRs2)));
+        end if;
+    end process rf;
 end rtl;
