@@ -41,12 +41,12 @@ package includes is
     end record ControlWB_t;
     -- Signals controlling functionality in the MEM stage
     type ControlM_t is record
-        Branch : std_logic;
         MemRead : std_logic;
         MemWrite : std_logic;
     end record ControlM_t;
     -- Signals controlling functinality in the EX stage
     type ControlEX_t is record
+        Branch : std_logic;
         ALUOp : alu_op_t;
         ALUSrcA : std_logic;
         ALUSrcB : std_logic;
@@ -81,11 +81,6 @@ package includes is
         -- Control signals
         WB : ControlWB_t;
         M : ControlM_t;
-        Zero : std_logic;
-        LessThan : std_logic;
-        LessThanU : std_logic;
-        GrThanEq : std_logic;
-        GrThanEqU : std_logic;
         -- Data signals
         PC : std_logic_vector(PC_WIDTH-1 downto 0);
         PCp4 : std_logic_vector(PC_WIDTH-1 downto 0);

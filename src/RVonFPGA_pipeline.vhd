@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 1.0   (last updated February 8, 2019)
+-- Revision     : 1.0   (last updated February 12, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,14 +23,13 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
+library work;
+use work.includes.all;
+
 entity pipeline is
-    generic (
-        PC_WIDTH : integer := 12; -- 2^12 is 4 kB
-        DATA_WIDTH : integer := 64
-    );
     port (
         -- Input ports
-        clk, reset : in std_logic;
+        clk, reset : in std_logic
         -- FILL IN HERE
         -- Output ports
         -- FILL IN HERE
@@ -41,89 +40,22 @@ architecture rtl of pipeline is
     -- Declarations for the PC
     signal pc, pc_next, pc_inc : std_logic_vector(PC_WIDTH-1 downto 0);
 
-    -- Declarations for the register control signals
-    type alu_op_t is (ALU_AND, ALU_OR, ALU_XOR, ALU_ADD, ALU_SUB, ALU_SLT, ALU_SLTU,
-                      ALU_SLL, ALU_SRL, ALU_SRA, ALU_NOP);
-    type wb_t is (WB_RES, WB_MEM, WB_PCp4);
-    -- Signals controlling functionality in the WB stage
-    type ControlWB_t is record
-        RegWrite : std_logic;
-        MemtoReg : wb_t;
-    end record ControlWB_t;
-    -- Signals controlling functionality in the MEM stage
-    type ControlM_t is record
-        Branch : std_logic;
-        MemRead : std_logic;
-        MemWrite : std_logic;
-    end record ControlM_t;
-    -- Signals controlling functinality in the EX stage
-    type ControlEX_t is record
-        ALUOp : alu_op_t;
-        ALUSrcA : std_logic;
-        ALUSrcB : std_logic;
-    end record ControlEX_t;
-
     -- Declarations for the IFID register
-    type IFID_t is record
-        PC : std_logic_vector(PC_WIDTH-1 downto 0);
-        PCp4 : std_logic_vector(PC_WIDTH-1 downto 0);
-        Instruction : std_logic_vector(31 downto 0);
-    end record IFID_t;
     signal IFID, IFID_next : IFID_t;
 
     -- Declarations for the IDEX register
-    type IDEX_t is record
-        -- Control signals
-        WB : ControlWB_t;
-        M : ControlM_t;
-        EX : ControlEX_t;
-        -- Data signals
-        PC : std_logic_vector(PC_WIDTH-1 downto 0);
-        PCp4 : std_logic_vector(PC_WIDTH-1 downto 0);
-        Immediate : std_logic_vector(DATA_WIDTH-1 downto 0);
-        Data1 : std_logic_vector(DATA_WIDTH-1 downto 0);
-        Data2 : std_logic_vector(DATA_WIDTH-1 downto 0);
-        RegisterRs1 : std_logic_vector(4 downto 0);
-        RegisterRs2 : std_logic_vector(4 downto 0);
-        RegisterRd : std_logic_vector(4 downto 0);
-    end record IDEX_t;
     signal IDEX, IDEX_next : IDEX_t;
 
     -- Declarations for the EXMEM register
-    type EXMEM_t is record
-        -- Control signals
-        WB : ControlWB_t;
-        M : ControlM_t;
-        Zero : std_logic;
-        LessThan : std_logic;
-        LessThanU : std_logic;
-        GrThanEq : std_logic;
-        GrThanEqU : std_logic;
-        -- Data signals
-        PC : std_logic_vector(PC_WIDTH-1 downto 0);
-        PCp4 : std_logic_vector(PC_WIDTH-1 downto 0);
-        Result : std_logic_vector(DATA_WIDTH-1 downto 0);
-        Data : std_logic_vector(DATA_WIDTH-1 downto 0);
-        RegisterRd : std_logic_vector(4 downto 0);
-    end record EXMEM_t;
     signal EXMEM, EXMEM_next : EXMEM_t;
 
     -- Declarations for the MEMWB register
-    type MEMWB_t is record
-        -- Control signals
-        WB : ControlWB_t;
-        -- Data signals
-        PCp4 : std_logic_vector(PC_WIDTH-1 downto 0);
-        MemData : std_logic_vector(DATA_WIDTH-1 downto 0);
-        Result : std_logic_vector(DATA_WIDTH-1 downto 0);
-        RegisterRd : std_logic_vector(4 downto 0);
-    end record MEMWB_t;
     signal MEMWB, MEMWB_next : MEMWB_t;
 
     -- Signals for the ID stage
 
     -- Signals for the EX stage
-    type op_t is (OP_IDEX, OP_EXMEM, OP_MEMWB);
+    signal Zero, LessThanU, LessThan, GrThanEqU, GrThanEqU : std_logic;
     signal ForwardA, ForwardB : op_t;
     signal ALUOperand1, ALUOperand2, ALUResult : std_logic_vector(DATA_WIDTH-1 downto 0);
 
@@ -162,7 +94,7 @@ architecture rtl of pipeline is
         );
         port (
             -- Control ports
-            clk, reset : in std_logic;
+            MemWrite, clk, reset : in std_logic;
             -- Data port
             Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
             Instruction : out std_logic_vector(31 downto 0)
@@ -205,8 +137,8 @@ begin
         RegisterRs1 => rs1,
         RegisterRs2 => rs2,
         RegisterRd => MEMWB.RegisterRd,
-        Data1 => ,-- FILL IN HERE
-        Data2 => ,-- FILL IN HERE
+        Data1 => IDEX_next.Data1,
+        Data2 => IDEX_next.Data2,
         WriteData => WriteData
     );
 
@@ -249,9 +181,9 @@ begin
         IDEX_next.EX.ALUSrcA <= '0';
         IDEX_next.EX.ALUSrcB <= '0';
         IDEX_next.EX.ALUOp <= ALU_NOP;
+        IDEX_next.EX.Branch <= '0';
         IDEX_next.M.MemRead <= '0';
         IDEX_next.M.MemWrite <= '0';
-        IDEX_next.M.Branch <= '0';
         IDEX_next.WB.RegWrite <= '0';
         IDEX_next.WB.MemtoReg <= WB_RES;
         IDEX_next.PC <= IFID.PC;
@@ -330,7 +262,7 @@ begin
                 IDEX_next.WB.RegWrite <= '1';
             when "1101111" => -- JAL
                 -- JAL performs an unconditional branch
-                IDEX_next.M.Branch <= '1';
+                IDEX_next.EX.Branch <= '1';
                 IDEX_next.WB.MemtoReg <= WB_PCp4;
                 IDEX_next.WB.RegWrite <= '1';
             when "1100111" => -- JALR
@@ -464,7 +396,7 @@ begin
             when ALU_SLL =>
                 -- For RV64I, the shamt value is 6 bits for register-register instructions and
                 -- for doubleword-size immediate instructions
-                ALUResult <= shift_left(ALUOperand1, to_integer(unsigned(ALUOperand2(5 downto 0))));
+                ALUResult <= std_logic_vector(shift_left(unsigned(ALUOperand1), to_integer(unsigned(ALUOperand2(5 downto 0)))));
             when ALU_SRL =>
                 ALUResult <= std_logic_vector(shift_right(unsigned(ALUOperand1), 
                                               to_integer(unsigned(ALUOperand2(5 downto 0)))));
@@ -476,30 +408,30 @@ begin
         end case alu;
         EXMEM_next.Result <= ALUResult;
         -- Code for the branch detection circuitry
-        if (ALUResult = 0) then
-            EXMEM_next.Zero <= '1';
-        else 
-            EXMEM_next.Zero <= '0';
+        if (unsigned(ALUResult) = 0) then
+            Zero <= '1';
+        else
+            Zero <= '0';
         end if;
         if (unsigned(ALUOperand1) < unsigned(ALUOperand2)) then
-            EXMEM_next.LessThanU <= '1';
-            EXMEM_next.GrThanEqU <= '0';
+            LessThanU <= '1';
+            GrThanEqU <= '0';
         else
-            EXMEM_next.LessThanU <= '0';
-            EXMEM_next.GrThanEqU <= '1';
+            LessThanU <= '0';
+            GrThanEqU <= '1';
         end if;
         if (signed(ALUOperand1) < signed(ALUOperand2)) then
-            EXMEM_next.LessThan <= '1';
-            EXMEM_next.GrThanEq <= '0';
+            LessThan <= '1';
+            GrThanEq <= '0';
         else 
-            EXMEM_next.LessThan <= '0';
-            EXMEM_next.GrThanEq <= '1';
+            LessThan <= '0';
+            GrThanEq <= '1';
         end if;
 
         -- Updating the PC
         pc_inc <= std_logic_vector(unsigned(pc) + 4);
         IFID_next.PCp4 <= pc_inc;
-        EXMEM_next.PC <= std_logic_vector(unsigned(IDEX.PC) + unsigned(shift_left(IDEX.Immediate, 1)));
+        EXMEM_next.PC <= std_logic_vector(unsigned(IDEX.PC) + shift_left(unsigned(IDEX.Immediate), 1));
         if (PCSrc = '0') then
             pc_next <= pc_inc;
         else
@@ -507,10 +439,10 @@ begin
         end if;
 
         -- Temporary branch logic in the MEM stage (only works for BEQ)
-        PCSrc <= EXMEM.M.Branch and EXMEM.Zero;
+        PCSrc <= EXMEM.EX.Branch and Zero;
 
         -- Determining the data to write back
-        wb : case (MemtoReg) is
+        wb : case (MEMWB.WB.MemtoReg) is
             when WB_RES =>
                 WriteData <= MEMWB.Result;
             when WB_MEM =>
