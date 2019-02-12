@@ -80,7 +80,7 @@ architecture rtl of data_mem is
         );
     end component;
 begin
-    -- Generating all of the control logic running the 
+    -- Generating all of the control logic running the block RAMs
     gen_control : for i in 0 to NB_COL-1 generate
         process (all)
             variable LowerBits : integer := to_integer(unsigned(Address(NB_LOG-1 downto 0)));
@@ -97,8 +97,8 @@ begin
             -- Data is stored little endian meaning that its bytes have to be reversed when
             -- they are to be stored (therefore, LowerBits is subtracted from i)
             -- Delivering data to the block RAMs
-            DataInArray(i) <= WriteData((((i-LowerBits) mod NB_COL)+1)*BLOCK_WIDTH-1 
-                                                downto ((i-LowerBits) mod NB_COL)*BLOCK_WIDTH);
+            DataInArray(i) <= WriteData(((to_integer(to_unsigned(i-LowerBits, NB_LOG)))+1)*BLOCK_WIDTH-1 
+                                    downto (to_integer(to_unsigned(i-LowerBits, NB_LOG)))*BLOCK_WIDTH);
 
             -- Delivering write enables to the block RAMs
             if (MemWrite = '1') then
@@ -157,7 +157,7 @@ begin
                                 (others => '0');
                         end if;
                     when MEM_LH =>
-                        if (i = LowerBits or i = (LowerBits+1) mod NB_COL) then
+                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG))) then
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
@@ -165,7 +165,7 @@ begin
                                 (others => ReadData(15));
                         end if;
                     when MEM_LHU =>
-                        if (i = LowerBits or i = (LowerBits+1) mod NB_COL) then
+                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG))) then
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
@@ -173,8 +173,9 @@ begin
                                 (others => '0');
                         end if;
                     when MEM_LW =>
-                        if (i = LowerBits or i = (LowerBits+1) mod NB_COL or 
-                            i = (LowerBits+2) mod NB_COL or i = (LowerBits+3) mod NB_COL) then
+                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG)) or 
+                            i = to_integer(to_unsigned(LowerBits+2, NB_LOG)) or 
+                            i = to_integer(to_unsigned(LowerBits+3, NB_LOG))) then
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
@@ -182,8 +183,9 @@ begin
                                 (others => ReadData(31));
                         end if;
                     when MEM_LWU =>
-                        if (i = LowerBits or i = (LowerBits+1) mod NB_COL or 
-                            i = (LowerBits+2) mod NB_COL or i = (LowerBits+3) mod NB_COL) then
+                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG)) or 
+                            i = to_integer(to_unsigned(LowerBits+2, NB_LOG)) or 
+                            i = to_integer(to_unsigned(LowerBits+3, NB_LOG))) then
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
