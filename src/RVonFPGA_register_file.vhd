@@ -68,14 +68,22 @@ begin
         -- Asynchronous reads with forwarding around the register file
         if (RegisterRs1 = RegisterRd and RegWrite = '1') then
             -- Forward data around the register file
-            Data1 <= WriteData;
+            if (unsigned(RegisterRs1) /= 0) then
+                Data1 <= WriteData;
+            else
+                Data1 <= (others => '0');
+            end if;
         else
             -- Output data from the register file
             Data1 <= regs(to_integer(unsigned(RegisterRs1)));
         end if;
         if (RegisterRs2 = RegisterRd and RegWrite = '1') then
             -- Forward data around the register file
-            Data2 <= WriteData;
+            if (unsigned(RegisterRs2) /= 0) then
+                Data2 <= WriteData;
+            else
+                Data2 <= (others => '0');
+            end if;
         else
             -- Output data from the register file
             Data2 <= regs(to_integer(unsigned(RegisterRs2)));
