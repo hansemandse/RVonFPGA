@@ -81,7 +81,7 @@ architecture rtl of data_mem is
     end component;
 begin
     -- Generating all of the control logic running the block RAMs
-    gen_control : for i in 0 to NB_COL-1 generate
+   gen_control : for i in 0 to NB_COL-1 generate
         process (all)
             variable LowerBits : integer := to_integer(unsigned(Address(NB_LOG-1 downto 0)));
         begin
@@ -94,8 +94,7 @@ begin
                 AddrArray(i) <= std_logic_vector(unsigned(Address) / NB_COL);
             end if;
 
-            -- Data is stored little endian meaning that its bytes have to be reversed when
-            -- they are to be stored (therefore, LowerBits is subtracted from i)
+            -- Data is stored little endian and data in is wrapped around 
             -- Delivering data to the block RAMs
             DataInArray(i) <= WriteData(((to_integer(to_unsigned(i-LowerBits, NB_LOG)))+1)*BLOCK_WIDTH-1 
                                     downto (to_integer(to_unsigned(i-LowerBits, NB_LOG)))*BLOCK_WIDTH);
@@ -146,7 +145,7 @@ begin
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => ReadData(7));
+                                (others => DataOutArray(LowerBits)(7));
                         end if;
                     when MEM_LBU =>
                         if (i = LowerBits) then
@@ -162,7 +161,7 @@ begin
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => ReadData(15));
+                                (others => DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)))(7));
                         end if;
                     when MEM_LHU =>
                         if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG))) then
@@ -180,7 +179,7 @@ begin
                                 DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
                         else
                             ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => ReadData(31));
+                                (others => DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)))(7));
                         end if;
                     when MEM_LWU =>
                         if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG)) or 
@@ -203,7 +202,7 @@ begin
             end if;
         end process;
     end generate gen_control;
-
+    
     -- Pipelining the address to ensure correct read outs of data as the block RAM
     -- performs synchronous reads
     reg : process (all)
