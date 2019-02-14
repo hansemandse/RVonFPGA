@@ -11,7 +11,7 @@
 --              : This entity represents the register file in a classic RISC-V pipeline.
 --              : It has two read ports and one write port. 
 --              |
--- Revision     : 1.0   (last updated February 9, 2019)
+-- Revision     : 1.0   (last updated February 14, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -44,41 +44,52 @@ end register_file;
 architecture rtl of register_file is
     constant ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH;
     type register_file_t is array(ARRAY_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal regs : register_file_t;
+    -- The following lines of code should force Vivado to implement this as distributed
+    -- RAM. However, Vivado claims that the memory is too sparse and therefore, they
+    -- are simply mapped to actual registers.
+    --attribute ram_style : string;
+    --attribute ram_style of regs : signal is "distributed";
 begin
-    -- Note that this implementation is synthesized to a large number of flip-flops by Vivado.
-    rf : process (all)
+    -- Note that this implementation is synthesized to LUT-RAM by Vivado. 
+    ram1 : process (all)
+        variable regs : register_file_t := (others => (others => '0'));
     begin
-        -- Synchronous writes and resets
+        -- Synchronous writes
         if (rising_edge(clk)) then
             if (RegWrite = '1' and unsigned(RegisterRd) /= 0) then
-                -- Write data into the register file
-                regs(to_integer(unsigned(RegisterRd))) <= WriteData;
+                regs(to_integer(unsigned(RegisterRd))) := WriteData;
             end if;
         end if;
-
-        -- Asynchronous reads with forwarding around the register file
+        -- Asynchronous reads
         if (RegisterRs1 = RegisterRd and RegWrite = '1') then
-            -- Forward data around the register file
-            if (unsigned(RegisterRs1) /= 0) then
+            if (unsigned(RegisterRd) /= 0) then
                 Data1 <= WriteData;
             else
                 Data1 <= (others => '0');
             end if;
         else
-            -- Output data from the register file
-            Data1 <= regs(to_integer(unsigned(RegisterRs1)));
+            Data1 <= regs(to_integer(unsigned(RegisterRs2)));
         end if;
+    end process ram1;
+
+    ram2 : process (all)
+        variable regs : register_file_t := (others => (others => '0'));
+    begin
+        -- Synchronous writes
+        if (rising_edge(clk)) then
+            if (RegWrite = '1' and unsigned(RegisterRd) /= 0) then
+                regs(to_integer(unsigned(RegisterRd))) := WriteData;
+            end if;
+        end if;
+        -- Asynchronous reads
         if (RegisterRs2 = RegisterRd and RegWrite = '1') then
-            -- Forward data around the register file
-            if (unsigned(RegisterRs2) /= 0) then
+            if (unsigned(RegisterRd) /= 0) then
                 Data2 <= WriteData;
             else
                 Data2 <= (others => '0');
             end if;
         else
-            -- Output data from the register file
             Data2 <= regs(to_integer(unsigned(RegisterRs2)));
         end if;
-    end process rf;
+    end process ram2;
 end rtl;
