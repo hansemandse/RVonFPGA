@@ -23,8 +23,7 @@ use IEEE.numeric_std.all;
 
 entity register_file is
     generic (
-        ADDR_WIDTH : integer := 5;
-        DATA_WIDTH : integer := 64
+        ADDR_WIDTH : integer := 5
     );
     port (
         -- Control ports
