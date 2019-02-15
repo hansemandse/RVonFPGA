@@ -53,87 +53,37 @@ architecture rtl of pipeline is
     signal MEMWB, MEMWB_next : MEMWB_t;
 
     -- Signals for the ID stage
+    signal Instruction : std_logic_vector(31 downto 0);
+    signal opcode, funct7 : std_logic_vector(6 downto 0);
+    signal funct3 : std_logic_vector(2 downto 0);
+    signal rs1, rs2, rd : std_logic_vector(4 downto 0);
+    signal IFIDWrite, PCWrite, InsertNOP : std_logic;
 
     -- Signals for the EX stage
-    signal Zero, LessThanU, LessThan, GrThanEqU, GrThanEqU : std_logic;
+    signal Zero, LessThanU, LessThan : std_logic;
     signal ForwardA, ForwardB : op_t;
-    signal ALUOperand1, ALUOperand2, ALUResult : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal ALUOperand1, ALUOperand2, ALUResult, ALUOperand1m, ALUOperand2m
+                                            : std_logic_vector(DATA_WIDTH-1 downto 0);
 
     -- Signals for the MEM stage
     signal PCSrc : std_logic;
 
     -- Signals for the WB stage
-    signal WriteData : std_logic_vector(DATA_WIDTH-1 downto 0);
-
-    -- External pipeline components
-    component register_file is
-        generic (
-            DATA_WIDTH : integer := 64;
-            ADDR_WIDTH : integer := 5;
-            ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH
-        );
-        port (
-            -- Control ports
-            RegWrite, clk, reset : in std_logic;
-            -- Read port 1
-            RegisterRs1 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            Data1 : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            -- Read port 2
-            RegisterRs2 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            -- Write port
-            RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
-        );
-    end component;
-
-    component instr_mem is
-        generic (
-            ADDR_WIDTH : integer := 12;
-            ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH
-        );
-        port (
-            -- Control ports
-            MemWrite, clk, reset : in std_logic;
-            -- Data port
-            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            Instruction : out std_logic_vector(31 downto 0)
-        );
-    end component;
-
-    component data_mem is
-        generic (
-            DATA_WIDTH : integer := 64;
-            ADDR_WIDTH : integer := 12; -- Might need to be changed
-            ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH
-        );
-        port (
-            -- Control ports
-            MemRead, MemWrite, clk, reset : in std_logic;
-            -- Data ports
-            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
-            ReadData : out std_logic_vector(DATA_WIDTH-1 downto 0)
-        );
-    end component;
-
+    signal WriteData, MemData : std_logic_vector(DATA_WIDTH-1 downto 0);
+    
 begin
-    -- Aliases for the ID stage
-    alias opcode : std_logic_vector(6 downto 0) is IFID.Instruction(6 downto 0);
-    alias rd : std_logic_vector(4 downto 0) is IFID.Instruction(11 downto 7);
-    alias funct3 : std_logic_vector(2 downto 0) is IFID.Instruction(14 downto 12);
-    alias rs1 : std_logic_vector(4 downto 0) is IFID.Instruction(19 downto 15);
-    alias rs2 : std_logic_vector(4 downto 0) is IFID.Instruction(24 downto 20);
-    alias funct7 : std_logic_vector(6 downto 0) is IFID.Instruction(31 downto 25);
+    -- Signals for the ID stage
+    opcode <= Instruction(6 downto 0);
+    rd <= Instruction(11 downto 7);
+    funct3 <= Instruction(14 downto 12);
+    rs1 <= Instruction(19 downto 15);
+    rs2 <= Instruction(24 downto 20);
+    funct7 <= Instruction(31 downto 25);
 
-    rf : register_file 
-    generic map (
-        DATA_WIDTH => DATA_WIDTH
-    )
+    rf : register_file
     port map (
         RegWrite => MEMWB.WB.RegWrite,
         clk => clk,
-        reset => reset,
         RegisterRs1 => rs1,
         RegisterRs2 => rs2,
         RegisterRd => MEMWB.RegisterRd,
@@ -143,10 +93,8 @@ begin
     );
 
     im : instr_mem
-    generic map (
-        ADDR_WIDTH => PC_WIDTH
-    )
     port map (
+        MemWrite => , -- FILL IN HERE
         clk => clk,
         reset => reset,
         Address => pc,
@@ -154,17 +102,15 @@ begin
     );
 
     dm : data_mem
-    generic map (
-        DATA_WIDTH => DATA_WIDTH
-    )
     port map (
         MemRead => EXMEM.M.MemRead,
         MemWrite => EXMEM.M.MemWrite,
+        MemOp => EXMEM.M.MemOp,
         clk => clk,
         reset => reset,
-        Address => EXMEM.Result,
+        Address => EXMEM.Result(DATA_ADDR_WIDTH-1 downto 0),
         WriteData => EXMEM.Data,
-        ReadData => -- FILL IN HERE
+        ReadData => MemData
     );
 
     -- Process describing all combinational parts of the circuit
@@ -181,9 +127,10 @@ begin
         IDEX_next.EX.ALUSrcA <= '0';
         IDEX_next.EX.ALUSrcB <= '0';
         IDEX_next.EX.ALUOp <= ALU_NOP;
-        IDEX_next.EX.Branch <= '0';
+        IDEX_next.EX.Branch <= BR_NOP;
         IDEX_next.M.MemRead <= '0';
         IDEX_next.M.MemWrite <= '0';
+        IDEX_next.M.MemOp <= MEM_NOP;
         IDEX_next.WB.RegWrite <= '0';
         IDEX_next.WB.MemtoReg <= WB_RES;
         IDEX_next.PC <= IFID.PC;
@@ -196,7 +143,7 @@ begin
         EXMEM_next.M <= IDEX.M;
         EXMEM_next.WB <= IDEX.WB;
         EXMEM_next.PCp4 <= IDEX.PCp4;
-        EXMEM_next.Data <= IDEX.Data2;
+        EXMEM_next.Data <= ALUOperand2m;
         EXMEM_next.RegisterRd <= IDEX.RegisterRd;
 
         -- Updating values of the MEMWB register
@@ -208,53 +155,63 @@ begin
         -- Immediate generator
         imm : case (opcode) is
             when "0110111" | "0010111" => -- LUI or AUIPC
-                IDEX_next.Immediate <= (11 downto 0 => '0', 30 downto 12 => IFID.Instruction(30 downto 12), 
-                                        others => IFID.Instruction(31));
+                IDEX_next.Immediate <= (11 downto 0 => '0', 30 downto 12 => Instruction(30 downto 12), 
+                                        others => Instruction(31));
             when "1101111" => -- JAL
-                IDEX_next.Immediate <= (0 => '0', 10 downto 1 => IFID.Instruction(30 downto 21), 
-                                        11 => IFID.Instruction(20), 19 downto 12 => IFID.Instruction(19 downto 12), 
-                                        others => IFID.Instruction(31));
+                IDEX_next.Immediate <= (0 => '0', 10 downto 1 => Instruction(30 downto 21), 
+                                        11 => Instruction(20), 19 downto 12 => Instruction(19 downto 12), 
+                                        others => Instruction(31));
             when "1100111" => -- JALR
-                IDEX_next.Immediate <= (10 downto 0 => IFID.Instruction(30 downto 20), 
-                                        others => IFID.Instruction(31));
+                IDEX_next.Immediate <= (10 downto 0 => Instruction(30 downto 20), 
+                                        others => Instruction(31));
             when "1100011" => -- branch instructions
-                IDEX_next.Immediate <= (0 => '0', 4 downto 1 => IFID.Instruction(11 downto 8), 
-                                        10 downto 5 => IFID.Instruction(30 downto 25), 11 => IFID.Instruction(7),
-                                        others => IFID.Instruction(31));
+                IDEX_next.Immediate <= (0 => '0', 4 downto 1 => Instruction(11 downto 8), 
+                                        10 downto 5 => Instruction(30 downto 25), 11 => Instruction(7),
+                                        others => Instruction(31));
             when "0000011" => -- load instructions 
-                IDEX_next.Immediate <= (10 downto 0 => IFID.Instruction(30 downto 20), 
-                                        others => IFID.Instruction(31));
+                IDEX_next.Immediate <= (10 downto 0 => Instruction(30 downto 20), 
+                                        others => Instruction(31));
             when "0010011" => -- immediate instructions
-                if (IFID.Instruction(14 downto 12) = "001" or IFID.Instruction(14 downto 12) = "101") then
+                if (funct3 = "001" or funct3 = "101") then
                     -- instruction is a shift, shamt has to be extracted
-                    IDEX_next.Immediate <= (5 downto 0 => IFID.Instruction(25 downto 20), others => '0');
+                    IDEX_next.Immediate <= (5 downto 0 => Instruction(25 downto 20), others => '0');
                 else
                     -- instruction is a regular immediate instruction
-                    IDEX_next.Immediate <= (10 downto 0 => IFID.Instruction(30 downto 20), 
-                                            others => IFID.Instruction(31));
+                    IDEX_next.Immediate <= (10 downto 0 => Instruction(30 downto 20), 
+                                            others => Instruction(31));
                 end if;
             when "0100011" => -- store instructions
-                IDEX_next.Immediate <= (4 downto 0 => IFID.Instruction(11 downto 7), 
-                                        10 downto 5 => IFID.Instruction(30 downto 25), others => IFID.Instruction(31));
+                IDEX_next.Immediate <= (4 downto 0 => Instruction(11 downto 7), 
+                                        10 downto 5 => Instruction(30 downto 25), others => Instruction(31));
             when "0011011" => -- immediate word instructions
-                if (IFID.Instruction(14 downto 12) = "000") then
+                if (funct3 = "000") then
                     -- instruction is an ADDIW
-                    IDEX_next.Immediate <= (10 downto 0 => IFID.Instruction(30 downto 20), others => IFID.Instruction(31));
+                    IDEX_next.Immediate <= (10 downto 0 => Instruction(30 downto 20), others => Instruction(31));
                 else
                     -- instruction is a shift, shamt has to be extracted
-                    IDEX_next.Immediate <= (4 downto 0 => IFID.Instruction(24 downto 20), others => '0');
+                    IDEX_next.Immediate <= (4 downto 0 => Instruction(24 downto 20), others => '0');
                 end if;
             when others => -- register-register instructions
                 IDEX_next.Immediate <= (others => '0');
         end case imm;
 
         -- Hazard detection
-        -- FILL IN HERE
+        if (IDEX.M.MemRead = '1' and (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
+            PCWrite <= '0';
+            IFIDWrite <= '0';
+            InsertNOP <= '1';
+        else
+            PCWrite <= '1';
+            IFIDWrite <= '1';
+            InsertNOP <= '0';
+        end if;
 
         -- Control generator
         control : case (opcode) is
             when "0110111" => -- LUI
-                -- FILL IN HERE
+                -- LUI places a sign-extended immediate in the destination register
+                IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.WB.RegWrite <= '1';
             when "0010111" => -- AUIPC
                 -- AUIPC adds a large immediate to the PC
                 IDEX_next.EX.ALUSrcA <= '1';
@@ -262,18 +219,59 @@ begin
                 IDEX_next.WB.RegWrite <= '1';
             when "1101111" => -- JAL
                 -- JAL performs an unconditional branch
-                IDEX_next.EX.Branch <= '1';
+                IDEX_next.EX.ALUSrcA <= '1';
+                IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.EX.Branch <= BR_J;
                 IDEX_next.WB.MemtoReg <= WB_PCp4;
                 IDEX_next.WB.RegWrite <= '1';
             when "1100111" => -- JALR
-                -- FILL IN HERE
+                -- JALR performs an unconditional branch
+                IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.EX.Branch <= BR_JR;
+                IDEX_next.WB.MemtoReg <= WB_PCp4;
+                IDEX_next.WB.RegWrite <= '1';
             when "1100011" => -- branch instructions
-                -- FILL IN HERE
+                -- Branch instructions require comparison between two register values
+                -- (the two register values are taken in between the two operand multiplexors
+                -- on each of the ALU's inputs)
+                IDEX_next.EX.ALUSrcA <= '1';
+                IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.EX.ALUOp <= ALU_ADD;
+                case (funct3) is 
+                    when "000" => -- BEQ
+                        IDEX_next.EX.Branch <= BR_EQ;
+                    when "001" => -- BNE
+                        IDEX_next.EX.Branch <= BR_NE;
+                    when "100" => -- BLT
+                        IDEX_next.EX.Branch <= BR_LT;
+                    when "101" => -- BGE
+                        IDEX_next.EX.Branch <= BR_GE;
+                    when "110" => -- BGEU
+                        IDEX_next.EX.Branch <= BR_GEU;
+                    when others => -- BLTU
+                        IDEX_next.EX.Branch <= BR_LTU;
+                end case;
             when "0000011" => -- load instructions 
                 -- Loads contain an immediate which is added to a register source
                 IDEX_next.EX.ALUSrcB <= '1';
                 IDEX_next.EX.ALUOp <= ALU_ADD;
                 IDEX_next.M.MemRead <= '1';
+                case (funct3) is
+                    when "000" => -- LB
+                        IDEX_next.M.MemOp <= MEM_LB;
+                    when "001" => -- LH
+                        IDEX_next.M.MemOp <= MEM_LH;
+                    when "010" => -- LW
+                        IDEX_next.M.MemOp <= MEM_LW;
+                    when "011" => -- LD
+                        IDEX_next.M.MemOp <= MEM_LD;
+                    when "100" => -- LBU
+                        IDEX_next.M.MemOp <= MEM_LBU;
+                    when "101" => -- LHU
+                        IDEX_next.M.MemOp <= MEM_LHU;
+                    when others => -- LWU
+                        IDEX_next.M.MemOp <= MEM_LWU;
+                end case;
                 IDEX_next.WB.RegWrite <= '1';
                 IDEX_next.WB.MemtoReg <= WB_MEM;
             when "0010011" => -- immediate instructions
@@ -306,6 +304,16 @@ begin
                 IDEX_next.EX.ALUSrcB <= '1';
                 IDEX_next.EX.ALUOp <= ALU_ADD;
                 IDEX_next.M.MemWrite <= '1';
+                case (funct3) is
+                    when "000" => -- SB
+                        IDEX_next.M.MemOp <= MEM_SB;
+                    when "001" => -- SH
+                        IDEX_next.M.MemOp <= MEM_SH;
+                    when "010" => -- SW
+                        IDEX_next.M.MemOp <= MEM_SW;
+                    when others => -- SD
+                        IDEX_next.M.MemOp <= MEM_SD;
+                end case;
             when "0011011" => -- immediate word instructions
                 -- FILL IN HERE
             when others => -- register-register instructions
@@ -339,32 +347,52 @@ begin
         end case control;
 
         -- Forwarding unit
-        -- FILL IN HERE
+        fA : if (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
+                                         and EXMEM.RegisterRd = IDEX.RegisterRs1) then
+            ForwardA <= OP_EXMEM;
+        elsif (MEMWB.WB.RegWrite = '1' and unsigned(MEMWB.RegisterRd) /= 0
+                                       and MEMWB.RegisterRd = IDEX.RegisterRs1) then
+            ForwardA <= OP_MEMWB;
+        else
+            ForwardA <= OP_IDEX;
+        end if;
+
+        fB : if (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
+                                         and EXMEM.RegisterRd = IDEX.RegisterRs2) then
+            ForwardB <= OP_EXMEM;
+        elsif (MEMWB.WB.RegWrite = '1' and unsigned(MEMWB.RegisterRd) /= 0
+                                       and MEMWB.RegisterRd = IDEX.RegisterRs2) then
+            ForwardB <= OP_MEMWB;
+        else
+            ForwardB <= OP_IDEX;
+        end if;
 
         -- Arithmetic circuit (ALU and its multiplexors)
         -- Choosing the first operand
+        case (ForwardA) is
+            when OP_IDEX =>
+                ALUOperand1m <= IDEX.Data1;
+            when OP_EXMEM =>
+                ALUOperand1m <= EXMEM.Result;
+            when others => -- OP_MEMWB
+                ALUOperand1m <= WriteData;
+        end case;
         op1 : if (IDEX.EX.ALUSrcA = '0') then
-            case (ForwardA) is
-                when OP_IDEX =>
-                    ALUOperand1 <= IDEX.Data1;
-                when OP_EXMEM =>
-                    ALUOperand1 <= EXMEM.Result;
-                when others =>
-                    ALUOperand1 <= WriteData;
-            end case;
+            ALUOperand1 <= ALUOperand1m;
         else
             ALUOperand1 <= (PC_WIDTH-1 downto 0 => IDEX.PC, others => '0');
         end if;
         -- Choosing the second operand (two layers of multiplexors)
+        case (ForwardB) is
+            when OP_IDEX =>
+                ALUOperand2m <= IDEX.Data2;
+            when OP_EXMEM =>
+                ALUOperand2m <= EXMEM.Result;
+            when others => -- OP_MEMWB
+                ALUOperand2m <= WriteData;
+        end case;
         op2 : if (IDEX.EX.ALUSrcB = '0') then
-            case (ForwardB) is
-                when OP_IDEX =>
-                    ALUOperand2 <= IDEX.Data2;
-                when OP_EXMEM =>
-                    ALUOperand2 <= EXMEM.Result;
-                when others =>
-                    ALUOperand2 <= WriteData;
-            end case;
+            ALUOperand2 <= ALUOperand2m;
         else
             ALUOperand2 <= IDEX.Immediate;
         end if op2;
@@ -396,7 +424,8 @@ begin
             when ALU_SLL =>
                 -- For RV64I, the shamt value is 6 bits for register-register instructions and
                 -- for doubleword-size immediate instructions
-                ALUResult <= std_logic_vector(shift_left(unsigned(ALUOperand1), to_integer(unsigned(ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_left(unsigned(ALUOperand1), 
+                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
             when ALU_SRL =>
                 ALUResult <= std_logic_vector(shift_right(unsigned(ALUOperand1), 
                                               to_integer(unsigned(ALUOperand2(5 downto 0)))));
@@ -404,49 +433,81 @@ begin
                 ALUResult <= std_logic_vector(shift_right(signed(ALUOperand1), 
                                               to_integer(unsigned(ALUOperand2(5 downto 0)))));
             when others =>
-                ALUResult <= (others => '0');
+                -- The second operand is passed through to allow LUI to work more easily
+                ALUResult <= ALUOperand2;
         end case alu;
         EXMEM_next.Result <= ALUResult;
         -- Code for the branch detection circuitry
-        if (unsigned(ALUResult) = 0) then
+        if (unsigned(ALUOperand1m) = unsigned(ALUOperand2m)) then
             Zero <= '1';
         else
             Zero <= '0';
         end if;
-        if (unsigned(ALUOperand1) < unsigned(ALUOperand2)) then
+        if (unsigned(ALUOperand1m) < unsigned(ALUOperand2m)) then
             LessThanU <= '1';
-            GrThanEqU <= '0';
         else
             LessThanU <= '0';
-            GrThanEqU <= '1';
         end if;
-        if (signed(ALUOperand1) < signed(ALUOperand2)) then
+        if (signed(ALUOperand1m) < signed(ALUOperand2m)) then
             LessThan <= '1';
-            GrThanEq <= '0';
         else 
             LessThan <= '0';
-            GrThanEq <= '1';
         end if;
-
-        -- Updating the PC
+        
+        -- Branch logic in the EX stage
         pc_inc <= std_logic_vector(unsigned(pc) + 4);
         IFID_next.PCp4 <= pc_inc;
-        EXMEM_next.PC <= std_logic_vector(unsigned(IDEX.PC) + shift_left(unsigned(IDEX.Immediate), 1));
-        if (PCSrc = '0') then
-            pc_next <= pc_inc;
-        else
-            pc_next <= EXMEM.pc;
-        end if;
-
-        -- Temporary branch logic in the MEM stage (only works for BEQ)
-        PCSrc <= EXMEM.EX.Branch and Zero;
+        br : case (IDEX.EX.Branch) is
+            when BR_J =>
+                pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+            when BR_JR =>
+                pc_next <= ALUResult(PC_WIDTH-1 downto 1) & '0';
+            when BR_EQ =>
+                if (Zero = '1') then
+                    pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+                else
+                    pc_next <= pc_inc;
+                end if;
+            when BR_NE =>
+                if (Zero = '0') then
+                    pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+                else
+                    pc_next <= pc_inc;
+                end if;
+            when BR_LT =>
+                if (LessThan = '1') then
+                    pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+                else
+                    pc_next <= pc_inc;
+                end if;
+            when BR_GE =>
+                if (LessThan = '0') then
+                    pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+                else
+                    pc_next <= pc_inc;
+                end if;
+            when BR_LTU =>
+                if (LessThanU = '1') then
+                    pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+                else
+                    pc_next <= pc_inc;
+                end if;
+            when BR_GEU =>
+                if (LessThanU = '0') then
+                    pc_next <= ALUResult(PC_WIDTH-1 downto 0);
+                else
+                    pc_next <= pc_inc;
+                end if;
+            when others => -- NOP
+                pc_next <= pc_inc;
+        end case br;
 
         -- Determining the data to write back
         wb : case (MEMWB.WB.MemtoReg) is
             when WB_RES =>
                 WriteData <= MEMWB.Result;
             when WB_MEM =>
-                WriteData <= MEMWB.MemData;
+                WriteData <= MemData;
             when WB_PCp4 =>
                 WriteData <= MEMWB.PCp4;
         end case wb;
@@ -458,11 +519,26 @@ begin
         if (rising_edge(clk)) then
             if (reset = '1') then
                 pc <= (others => '0');
-                -- FILL IN HERE
+                IFID <= IFID_reset;
+                IDEX <= IDEX_reset;
+                EXMEM <= EXMEM_reset;
+                MEMWB <= MEMWB_reset;
             else
-                pc <= pc_next;
-                IFID <= IFID_next;
-                IDEX <= IDEX_next;
+                if (PCWrite = '1') then
+                    pc <= pc_next;
+                else
+                    pc <= pc;
+                end if;
+                if (IFIDWrite = '1') then
+                    IFID <= IFID_next;
+                else
+                    IFID <= IFID;
+                end if;
+                if (InsertNOP = '1') then
+                    IDEX <= IDEX_reset;
+                else
+                    IDEX <= IDEX_next;
+                end if;
                 EXMEM <= EXMEM_next;
                 MEMWB <= MEMWB_next;
             end if;
