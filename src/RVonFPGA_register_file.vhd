@@ -21,6 +21,9 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
+library work;
+use work.includes.all;
+
 entity register_file is
     generic (
         ADDR_WIDTH : integer := 5
