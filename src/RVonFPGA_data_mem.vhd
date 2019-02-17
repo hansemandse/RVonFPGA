@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This entity represents the data memory of the pipeline.
 --              |
--- Revision     : 1.0   (last updated February 11, 2019)
+-- Revision     : 1.0   (last updated February 17, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -88,10 +88,10 @@ begin
             -- Delivering addresses to the block RAMs
             if (LowerBits > i) then
                 -- Address should be one higher
-                AddrArray(i) <= std_logic_vector((unsigned(Address) / NB_COL) + 1);
+                AddrArray(i) <= std_logic_vector(unsigned(Address(ADDR_WIDTH-1 downto 3)) + 1);
             else
                 -- Address is simply the given address divived by number of columns
-                AddrArray(i) <= std_logic_vector(unsigned(Address) / NB_COL);
+                AddrArray(i) <= Address(ADDR_WIDTH-1 downto 3);
             end if;
 
             -- Data is stored little endian and data in is wrapped around 
