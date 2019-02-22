@@ -46,7 +46,7 @@ end register_file;
 architecture rtl of register_file is
     constant ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH;
     type register_file_t is array(ARRAY_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal regs : register_file_t;
+    signal regs : register_file_t := (others => (others => '0'));
 begin
     -- Note that this implementation is synthesized to a large number of flip-flops by Vivado.
     rf : process (all)
