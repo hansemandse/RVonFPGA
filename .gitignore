@@ -1,0 +1,4 @@
+*.bin
+*.s
+*.o
+/src_old
