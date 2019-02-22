@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This entity represents the data memory of the pipeline.
 --              |
--- Revision     : 1.0   (last updated February 17, 2019)
+-- Revision     : 1.1   (last updated February 22, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -83,8 +83,9 @@ begin
     -- Generating all of the control logic running the block RAMs
    gen_control : for i in 0 to NB_COL-1 generate
         process (all)
-            variable LowerBits : integer := to_integer(unsigned(Address(NB_LOG-1 downto 0)));
+            variable LowerBits, LowerBits2 : integer;
         begin
+            LowerBits := to_integer(unsigned(Address(NB_LOG-1 downto 0)));
             -- Delivering addresses to the block RAMs
             if (LowerBits > i) then
                 -- Address should be one higher
@@ -134,74 +135,62 @@ begin
             else
                 WEArray(i) <= '0';
             end if;
-
-            -- Generating the output data from the results
-            LowerBits := to_integer(unsigned(Address_p));
-            if (MemRead_p = '1') then
-                case (MemOp_p) is
-                    when MEM_LB =>
-                        if (i = LowerBits) then
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                        else
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => DataOutArray(LowerBits)(7));
-                        end if;
-                    when MEM_LBU =>
-                        if (i = LowerBits) then
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                        else
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => '0');
-                        end if;
-                    when MEM_LH =>
-                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG))) then
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                        else
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)))(7));
-                        end if;
-                    when MEM_LHU =>
-                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG))) then
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                        else
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => '0');
-                        end if;
-                    when MEM_LW =>
-                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG)) or 
-                            i = to_integer(to_unsigned(LowerBits+2, NB_LOG)) or 
-                            i = to_integer(to_unsigned(LowerBits+3, NB_LOG))) then
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                        else
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)))(7));
-                        end if;
-                    when MEM_LWU =>
-                        if (i = LowerBits or i = to_integer(to_unsigned(LowerBits+1, NB_LOG)) or 
-                            i = to_integer(to_unsigned(LowerBits+2, NB_LOG)) or 
-                            i = to_integer(to_unsigned(LowerBits+3, NB_LOG))) then
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                        else
-                            ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                                (others => '0');
-                        end if;
-                    when others =>
-                        -- Reaching this point means that MemOp_p must be MEM_LD as MemRead = '1'
-                        -- and MemOp_p is none of the above
-                        ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <=
-                            DataOutArray(to_integer(to_unsigned(i+LowerBits, NB_LOG)));
-                end case;
-            else
-                ReadData((i+1)*BLOCK_WIDTH-1 downto i*BLOCK_WIDTH) <= (others => '0');
-            end if;
         end process;
     end generate gen_control;
+
+    gen_out : process (all)
+        variable LowerBits : integer;
+    begin
+        -- Generating the output data from the results
+        -- The following code may not look as pretty as it would be to have it be written in
+        -- std_logic_vectors (such as (BLOCK_WIDTH-1 downto 0 => DataOutArray(i))), but that
+        -- implementation unfortunately does not work when indexing several array positions
+        -- within a single assignment
+        LowerBits := to_integer(unsigned(Address_p));
+        if (MemRead_p = '1') then
+            case (MemOp_p) is
+                when MEM_LB =>
+                    ReadData <= (others => DataOutArray(LowerBits)(7));
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                when MEM_LBU =>
+                    ReadData <= (others => '0');
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                when MEM_LH =>
+                    ReadData <= (others => DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)))(7));
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                    ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
+                when MEM_LHU =>
+                    ReadData <= (others => '0');
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                    ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
+                when MEM_LW =>
+                    ReadData <= (others => DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)))(7));
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                    ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
+                    ReadData(3*BLOCK_WIDTH-1 downto 2*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+2, NB_LOG)));
+                    ReadData(4*BLOCK_WIDTH-1 downto 3*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)));
+                when MEM_LWU =>
+                    ReadData <= (others => '0');
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                    ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
+                    ReadData(3*BLOCK_WIDTH-1 downto 2*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+2, NB_LOG)));
+                    ReadData(4*BLOCK_WIDTH-1 downto 3*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)));
+                when others =>
+                    -- Reaching this point means that MemOp_p must be MEM_LD as MemRead = '1'
+                    -- and MemOp_p is none of the above
+                    ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
+                    ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
+                    ReadData(3*BLOCK_WIDTH-1 downto 2*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+2, NB_LOG)));
+                    ReadData(4*BLOCK_WIDTH-1 downto 3*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)));
+                    ReadData(5*BLOCK_WIDTH-1 downto 4*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+4, NB_LOG)));
+                    ReadData(6*BLOCK_WIDTH-1 downto 5*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+5, NB_LOG)));
+                    ReadData(7*BLOCK_WIDTH-1 downto 6*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+6, NB_LOG)));
+                    ReadData(8*BLOCK_WIDTH-1 downto 7*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+7, NB_LOG)));
+            end case;
+        else
+            ReadData <= (others => '0');
+        end if;
+    end process gen_out;
     
     -- Pipelining the address to ensure correct read outs of data as the block RAM
     -- performs synchronous reads

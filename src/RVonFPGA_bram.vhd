@@ -39,13 +39,13 @@ end bram;
 architecture rtl of bram is
     constant ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH;
     type ram_t is array(ARRAY_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal ram : ram_t := (others => (others => '0'));
 begin
     mem : process (all)
-        variable ram : ram_t := (others => (others => '0'));
     begin
         if (rising_edge(clk)) then
             if (we = '1') then
-                ram(to_integer(unsigned(addr))) := data_in;
+                ram(to_integer(unsigned(addr))) <= data_in;
             end if;
             if (reset = '1') then
                 data_out <= (others => '0');
