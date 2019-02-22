@@ -15,31 +15,31 @@
 # ********************************************************************************************
 
 # Declarations of environment variables
-CC := riscv64-unknown-elf-gcc
-CF := -c # files are compiled but not linked (causes a warning, but output files should be OK)
-objcopy := riscv64-unknown-elf-objcopy
 march := -march=rv64i # compile for RV64I ISA
 mabi := -mabi=lp64 # define long as 64 bits, int as 32 bits, short as 16 bits and char as 8 bits
+CC := riscv64-unknown-elf-gcc
+CFLAGS := $(march) $(mabi) -c # files are compiled but not linked (output files should be OK)
+objcopy := riscv64-unknown-elf-objcopy
 bin := .bin
+
+SRC := $(wildcard *.c)
+OBJS := $(SRC:.c=.o)
+BINS := $(OBJS:.o=.bin)
 
 # Definition of make all
 .PHONY : all
-all : add sub
+all : comp binary
 
 # Definition of all programs to make
-add : add.o
-	$(objcopy) $< --dump-section .text=$@$(bin)
-	@echo $@$(bin) successfully created
-add.o : add.c
-	$(CC) $(march) $(mabi) $(CF) $< -o $@
-	$(CC) $(march) $(mabi) -S $< $@
+comp : $(OBJS)
+%.o : %.c
+	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) -S $< $@
 	@echo $@ successfully created
-sub : sub.o
-	$(objcopy) $< --dump-section .text=$@$(bin)
-	@echo $@$(bin) successfully created
-sub.o : sub.c
-	$(CC) $(march) $(mabi) $(CF) $< -o $@
-	$(CC) $(march) $(mabi) -S $< $@
+
+binary : $(BINS)
+%.bin : %.o
+	$(objcopy) $< --dump-section .text=$@
 	@echo $@ successfully created
 
 # Definition of make clean
