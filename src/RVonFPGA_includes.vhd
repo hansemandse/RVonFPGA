@@ -11,7 +11,7 @@
 --              : This file contains all of the type definitions required in the pipeline
 --              : and in the memories.
 --              |
--- Revision     : 1.0   (last updated February 9, 2019)
+-- Revision     : 1.0   (last updated February 15, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -35,6 +35,7 @@ package includes is
     type branch_t is (BR_J, BR_JR, BR_EQ, BR_NE, BR_LT, BR_LTU, BR_GE, BR_GEU, BR_NOP);
     type mem_op_t is (MEM_LB, MEM_LBU, MEM_LH, MEM_LHU, MEM_LW, MEM_LWU, MEM_LD, MEM_SB,
                       MEM_SH, MEM_SW, MEM_SD, MEM_NOP);
+    type imem_op_t is (MEM_SB, MEM_SW, MEM_SD, MEM_NOP);
     type wb_t is (WB_RES, WB_MEM, WB_PCp4);
     type op_t is (OP_IDEX, OP_EXMEM, OP_MEMWB);
 
