@@ -26,8 +26,8 @@ use work.includes.all;
 
 entity data_mem is
     generic (
-        BLOCK_WIDTH : integer := 8;
-        ADDR_WIDTH : integer := 12
+        BLOCK_WIDTH : natural := 8;
+        ADDR_WIDTH : natural := 12
     );
     port (
         -- Control ports
@@ -43,9 +43,9 @@ end data_mem;
 architecture rtl of data_mem is
     -- Number of RAM blocks to be implemented
     constant NB_COL : integer := DATA_WIDTH / BLOCK_WIDTH;
-    constant NB_LOG : integer := integer(log2(real(NB_COL)));
+    constant NB_LOG : natural := natural(log2(real(NB_COL)));
     -- Address width for the internal block RAMs
-    constant ADDR_WIDTH_INT : integer := ADDR_WIDTH - NB_LOG;
+    constant ADDR_WIDTH_INT : natural := ADDR_WIDTH - NB_LOG;
 
     -- Signals for the pipelined control
     signal MemRead_p : std_logic;

@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This entity represents the instruction memory of the pipeline.
 --              |
--- Revision     : 1.0   (last updated February 25, 2019)
+-- Revision     : 1.0   (last updated February 28, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -26,8 +26,9 @@ use work.includes.all;
 
 entity instr_mem is
     generic (
-        BLOCK_WIDTH : integer := 8;
-        ADDR_WIDTH : integer := PC_WIDTH
+        BLOCK_WIDTH : natural := 8;
+        ADDR_WIDTH : natural := PC_WIDTH;
+        TEST_FILE : string := "../tests/add.bin"
     );
     port (
         -- Control ports
@@ -43,9 +44,9 @@ end instr_mem;
 architecture rtl of instr_mem is
     -- Number of RAM blocks to be implemented
     constant NB_COL : integer := DATA_WIDTH / BLOCK_WIDTH;
-    constant NB_LOG : integer := integer(log2(real(NB_COL)));
+    constant NB_LOG : natural := natural(log2(real(NB_COL)));
     -- Address width for the internal block RAMs
-    constant ADDR_WIDTH_INT : integer := ADDR_WIDTH - NB_LOG;
+    constant ADDR_WIDTH_INT : natural := ADDR_WIDTH - NB_LOG;
 
     -- Signal for the pipelined control
     signal Address_p : std_logic_vector(ADDR_WIDTH-1 downto 0);
@@ -63,10 +64,12 @@ architecture rtl of instr_mem is
     signal DataOutArray, DataInArray : data_a_t;
 
     -- The block ram component
-    component bram
+    component bram_init
         generic (
-            DATA_WIDTH : integer := BLOCK_WIDTH;
-            ADDR_WIDTH : integer := ADDR_WIDTH_INT
+            DATA_WIDTH : natural := BLOCK_WIDTH;
+            ADDR_WIDTH : natural := ADDR_WIDTH_INT;
+            TEST_FILE : string;
+            NO_RAMS, RAM_NO : integer
         );
         port (
             -- Control ports
@@ -78,24 +81,20 @@ architecture rtl of instr_mem is
         );
     end component;
 begin
+    -- TODO: Implement smart addressing such that the RAM is not activated/given
+    -- new addresses every clock cycle if accesses follow each other
+
     -- Generating all of the control logic running the block RAMs
    gen_control : for i in 0 to NB_COL-1 generate
         process (all)
             variable LowerBits : integer;
         begin
             LowerBits := to_integer(unsigned(Address(NB_LOG-1 downto 0)));
+
             -- Data is stored little endian and data in is wrapped around 
             -- Delivering data to the block RAMs
             DataInArray(i) <= WriteData(((to_integer(to_unsigned(i-LowerBits, NB_LOG)))+1)*BLOCK_WIDTH-1 
                                     downto (to_integer(to_unsigned(i-LowerBits, NB_LOG)))*BLOCK_WIDTH);
-
-            -- Delivering addresses to the block RAMs (implement this in a smart way, such that
-            -- instructions are not necessarily fetched at every cycle)
-            if (unsigned(Address) = unsigned(Address_p)+4 and unsigned(Address_p(NB_LOG-1 downto 0)) = 0) then
-                AddrArray(i) <= Address_p(ADDR_WIDTH-1 downto NB_LOG);
-            else
-                AddrArray(i) <= Address(ADDR_WIDTH-1 downto NB_LOG);
-            end if;
 
             -- Delivering write enable signals to the block RAMs
             if (MemWrite = '1') then
@@ -123,6 +122,16 @@ begin
             else
                 WEArray(i) <= '0';
             end if;
+
+            -- Delivering addresses to the block RAMs (implement this in a smart way, such that
+            -- instructions are not necessarily fetched at every cycle)
+            if (LowerBits > i) then
+                -- Address should be one higher
+                AddrArray(i) <= std_logic_vector(unsigned(Address(ADDR_WIDTH-1 downto NB_LOG)) + 1);
+            else
+                -- Address is simply the given address divived by number of columns
+                AddrArray(i) <= Address(ADDR_WIDTH-1 downto NB_LOG);
+            end if;
         end process;
     end generate gen_control;
 
@@ -130,6 +139,7 @@ begin
         variable LowerBits : integer;
     begin
         LowerBits := to_integer(unsigned(Address_p(NB_LOG-1 downto 0)));
+        -- This memory constantly outputs a single instruction
         ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
         ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
         ReadData(3*BLOCK_WIDTH-1 downto 2*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+2, NB_LOG)));
@@ -139,7 +149,7 @@ begin
     reg : process (all)
     begin
         if (rising_edge(clk)) then
-            if (reset = '0') then
+            if (reset = '1') then
                 Address_p <= (others => '0');
             else
                 Address_p <= Address;
@@ -149,7 +159,12 @@ begin
 
     -- Generating the required number of block RAMs
     gen_brams : for i in 0 to NB_COL-1 generate
-        brams : bram port map (
+        brams : bram_init generic map (
+            TEST_FILE => TEST_FILE,
+            NO_RAMS => NB_COL,
+            RAM_NO => i
+        )
+        port map (
             clk => clk,
             reset => reset,
             we => WEArray(i),

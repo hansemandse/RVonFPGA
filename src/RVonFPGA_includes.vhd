@@ -11,7 +11,7 @@
 --              : This file contains all of the type definitions required in the pipeline
 --              : and in the memories.
 --              |
--- Revision     : 1.0   (last updated February 15, 2019)
+-- Revision     : 1.0   (last updated February 28, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,9 +23,9 @@ use IEEE.numeric_std.all;
 
 package includes is
     -- Relevant constants
-    constant DATA_ADDR_WIDTH : integer := 12;
-    constant PC_WIDTH : integer := 12;
-    constant DATA_WIDTH : integer := 64;
+    constant DATA_ADDR_WIDTH : natural := 12;
+    constant PC_WIDTH : natural := 12;
+    constant DATA_WIDTH : natural := 64;
     constant PC_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '0');
     constant PCp4_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (2 => '1', others => '0');
 
@@ -123,7 +123,7 @@ package includes is
     -- Register file component declaration
     component register_file is
         generic (
-            ADDR_WIDTH : integer := 5
+            ADDR_WIDTH : natural := 5
         );
         port (
             -- Control ports
@@ -143,8 +143,8 @@ package includes is
     -- Data memory component declaration
     component data_mem is
         generic (
-            BLOCK_WIDTH : integer := 8;
-            ADDR_WIDTH : integer := DATA_ADDR_WIDTH
+            BLOCK_WIDTH : natural := 8;
+            ADDR_WIDTH : natural := DATA_ADDR_WIDTH
         );
         port (
             -- Control ports
@@ -157,17 +157,21 @@ package includes is
         );
     end component;
 
-    -- Instruction memory component declaration (IN PROGRESS)
+    -- Instruction memory component declaration
     component instr_mem is
         generic (
-            ADDR_WIDTH : integer := PC_WIDTH
+            BLOCK_WIDTH : natural := 8;
+            ADDR_WIDTH : natural := PC_WIDTH;
+            TEST_FILE : string := "../tests/add.bin"
         );
         port (
             -- Control ports
             MemWrite, clk, reset : in std_logic;
+            ImemOp : in imem_op_t;
             -- Data port
             Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            Instruction : out std_logic_vector(31 downto 0)
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            ReadData : out std_logic_vector(31 downto 0)
         );
     end component;
 end includes;
