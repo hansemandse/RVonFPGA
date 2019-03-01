@@ -119,61 +119,6 @@ package includes is
     end record MEMWB_t;
     constant MEMWB_reset : MEMWB_t := (WB => WB_reset, PCp4 => PCp4_reset, 
                                        Result => (others => '0'), RegisterRd => (others => '0'));
-
-    -- Register file component declaration
-    component register_file is
-        generic (
-            ADDR_WIDTH : natural := 5
-        );
-        port (
-            -- Control ports
-            RegWrite, clk : in std_logic;
-            -- Read port 1
-            RegisterRs1 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            Data1 : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            -- Read port 2
-            RegisterRs2 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            -- Write port
-            RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
-        );
-    end component;
-
-    -- Data memory component declaration
-    component data_mem is
-        generic (
-            BLOCK_WIDTH : natural := 8;
-            ADDR_WIDTH : natural := DATA_ADDR_WIDTH
-        );
-        port (
-            -- Control ports
-            MemRead, MemWrite, clk, reset : in std_logic;
-            MemOp : in mem_op_t;
-            -- Data ports
-            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
-            ReadData : out std_logic_vector(DATA_WIDTH-1 downto 0)
-        );
-    end component;
-
-    -- Instruction memory component declaration
-    component instr_mem is
-        generic (
-            BLOCK_WIDTH : natural := 8;
-            ADDR_WIDTH : natural := PC_WIDTH;
-            TEST_FILE : string := "../tests/add.bin"
-        );
-        port (
-            -- Control ports
-            MemWrite, clk, reset : in std_logic;
-            ImemOp : in imem_op_t;
-            -- Data port
-            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
-            ReadData : out std_logic_vector(31 downto 0)
-        );
-    end component;
 end includes;
 
 package body includes is

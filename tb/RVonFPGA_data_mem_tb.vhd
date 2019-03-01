@@ -48,6 +48,23 @@ architecture rtl of data_mem_tb is
     signal MemOp : mem_op_t := MEM_NOP;
     signal Address : std_logic_vector(DATA_ADDR_WIDTH-1 downto 0) := (others => '0');
     signal WriteData, ReadData : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+
+    -- Data memory component declaration
+    component data_mem is
+        generic (
+            BLOCK_WIDTH : natural := 8;
+            ADDR_WIDTH : natural := DATA_ADDR_WIDTH
+        );
+        port (
+            -- Control ports
+            MemRead, MemWrite, clk, reset : in std_logic;
+            MemOp : in mem_op_t;
+            -- Data ports
+            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            ReadData : out std_logic_vector(DATA_WIDTH-1 downto 0)
+        );
+    end component;
 begin
     dut : data_mem 
     port map (

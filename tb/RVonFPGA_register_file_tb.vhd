@@ -37,6 +37,26 @@ architecture rtl of register_file_tb is
     signal RegWrite, clk : std_logic := '0';
     signal rs1, rs2, rd : std_logic_vector(4 downto 0) := (others => '0');
     signal Data1, Data2, WriteData : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+
+    -- Register file component declaration
+    component register_file is
+        generic (
+            ADDR_WIDTH : natural := 5
+        );
+        port (
+            -- Control ports
+            RegWrite, clk : in std_logic;
+            -- Read port 1
+            RegisterRs1 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            Data1 : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- Read port 2
+            RegisterRs2 : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- Write port
+            RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
+        );
+    end component;
 begin
     dut : register_file
     port map (

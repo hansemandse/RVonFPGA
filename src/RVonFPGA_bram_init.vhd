@@ -56,13 +56,15 @@ architecture rtl of bram_init is
         variable index : natural := 0;
         variable res : ram_t := (others => (others => '0'));
     begin
-        readline(file_in, c_line);
-        while (index < MEM_SIZE) loop
-            read(c_line, c_buf);
-            if (to_unsigned(index, integer(log2(real(NO_RAMS)))) = RAM_NO) then
-                res(index/NO_RAMS) := std_logic_vector(to_unsigned(character'pos(c_buf), DATA_WIDTH));
-            end if;
-            index := index + 1;
+        while (not endfile(file_in)) loop
+            readline(file_in, c_line);
+            while (index < MEM_SIZE) loop
+                read(c_line, c_buf);
+                if (to_unsigned(index, integer(log2(real(NO_RAMS)))) = RAM_NO) then
+                    res(index/NO_RAMS) := std_logic_vector(to_unsigned(character'pos(c_buf), DATA_WIDTH));
+                end if;
+                index := index + 1;
+            end loop;
         end loop;
         return res;
     end function;
