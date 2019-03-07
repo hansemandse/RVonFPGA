@@ -8,7 +8,7 @@
 # Purpose		: This makefile serves the purpose of making compilation of small
 #				: test programs for the implemented RV64I pipeline easy.
 #				|
-# Revision	    : 1.0 (last updated February 22, 2019)
+# Revision	    : 1.0 (last updated March 7, 2019)
 #				|
 # Available at  : https://github.com/hansemandse/RVonFPGA
 #				|	
@@ -22,19 +22,23 @@ CFLAGS := $(march) $(mabi) -c # files are compiled but not linked (output files 
 objcopy := riscv64-unknown-elf-objcopy
 bin := .bin
 
-SRC := $(wildcard *.c)
+SRC := $(wildcard c_tests/*.c) 
 OBJS := $(SRC:.c=.o)
 BINS := $(OBJS:.o=.bin)
 
+SSRC := $(wildcard s_tests/*.s)
+SOBJS := $(SSRC:.s=.o)
+SBINS := $(SOBJS:.o=.bin)
+
 # Definition of make all
 .PHONY : all
-all : comp binary
+all : comp binary scomp sbinary
 
-# Definition of all programs to make
+# Definition of all C programs to make
 comp : $(OBJS)
 %.o : %.c
 	$(CC) $(CFLAGS) $< -o $@
-	$(CC) $(CFLAGS) -S $< $@
+	$(CC) $(CFLAGS) -S $< $@ -o $(basename $<).s
 	@echo $@ successfully created
 
 binary : $(BINS)
@@ -42,12 +46,26 @@ binary : $(BINS)
 	$(objcopy) $< --dump-section .text=$@
 	@echo $@ successfully created
 
+# Definition of all assembly programs to make
+scomp : $(SOBJS)
+%.o : %.s
+	$(CC) $(CFLAGS) $< -o $@
+	@echo $@ successfully created
+
+sbinary : $(SBINS)
+%.bin : %.o
+	$(objcopy) $< --dump-section .text=$@
+	@echo $@ successfully created
+
 # Definition of make clean
 .PHONY : clean
 clean : 
-	rm -rf *.s
-	rm -rf *.o
-	rm -rf *.bin	
+	@rm -rf c_tests/*.s
+	@rm -rf c_tests/*.o
+	@rm -rf c_tests/*.bin
+	@rm -rf s_tests/*.o
+	@rm -rf s_tests/*.bin
+	@echo Removed all created .s, .o and .bin files
 
 # Definition of a test command to print gcc version
 .PHONY : test

@@ -1,4 +1,4 @@
 *.bin
-*.s
+c_tests/*.s
 *.o
 /src_old

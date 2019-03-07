@@ -43,7 +43,7 @@ architecture rtl of instr_mem_tb is
     -- Signals for interfacing the memory
     signal MemWrite, clk, reset : std_logic := '0';
     signal ImemOp : imem_op_t := MEM_NOP;
-    signal Address : std_logic_vector(DATA_ADDR_WIDTH-1 downto 0) := (others => '0');
+    signal ReadAddress, WriteAddress : std_logic_vector(DATA_ADDR_WIDTH-1 downto 0) := (others => '0');
     signal ReadData : std_logic_vector(31 downto 0);
     signal WriteData : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
 
@@ -58,10 +58,12 @@ architecture rtl of instr_mem_tb is
             -- Control ports
             MemWrite, clk, reset : in std_logic;
             ImemOp : in imem_op_t;
-            -- Data port
-            Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
-            ReadData : out std_logic_vector(31 downto 0)
+            -- Read port
+            ReadAddress : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            ReadData : out std_logic_vector(31 downto 0);
+            -- Write port
+            WriteAddress : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
         );
     end component;
 begin
@@ -72,9 +74,11 @@ begin
         clk => clk,
         reset => reset,
         ImemOp => ImemOp,
-        -- Data ports
-        Address => Address,
+        -- Read port
+        ReadAddress => ReadAddress,
         ReadData => ReadData,
+        -- Write port
+        WriteAddress => WriteAddress,
         WriteData => WriteData
     );
 
@@ -85,22 +89,23 @@ begin
         wait until falling_edge(clk);
         -- Running through all of the relevant array positions to read all instructions
         for i in 0 to 20 loop
-            Address <= std_logic_vector(to_unsigned(i*4, PC_WIDTH));
+            ReadAddress <= std_logic_vector(to_unsigned(i*4, PC_WIDTH));
             wait until falling_edge(clk);
         end loop;
 
         -- Testing the SD functionality
         MemWrite <= '1';
         ImemOp <= MEM_SD;
-        Address <= SD_ADDR;
+        WriteAddress <= SD_ADDR;
         WriteData <= TEST_DATA;
         wait until falling_edge(clk);
         MemWrite <= '0';
         ImemOp <= MEM_NOP;
+        ReadAddress <= SD_ADDR;
         wait until falling_edge(clk);
         assert ReadData = TEST_DATA(31 downto 0) 
             report "Read data after SD is incorrect" severity FAILURE;
-        Address <= std_logic_vector(unsigned(SD_ADDR)+4);
+        ReadAddress <= std_logic_vector(unsigned(SD_ADDR)+4);
         wait until falling_edge(clk);
         assert ReadData = TEST_DATA(63 downto 32) 
             report "Read data after SD is incorrect" severity FAILURE;
@@ -109,10 +114,11 @@ begin
         -- Testing the SW functionality
         MemWrite <= '1';
         ImemOp <= MEM_SW;
-        Address <= SW_ADDR;
+        WriteAddress <= SW_ADDR;
         wait until falling_edge(clk);
         MemWrite <= '0';
         ImemOp <= MEM_NOP;
+        ReadAddress <= SW_ADDR;
         wait until falling_edge(clk);
         assert ReadData = TEST_DATA(31 downto 0) 
             report "Read data after SW is incorrect" severity FAILURE;
@@ -121,13 +127,14 @@ begin
         -- Testing the SB functionality
         MemWrite <= '1';
         ImemOp <= MEM_SB;
-        Address <= SB_ADDR;
+        WriteAddress <= SB_ADDR;
         wait until falling_edge(clk);
         MemWrite <= '0';
         ImemOp <= MEM_NOP;
+        ReadAddress <= SB_ADDR;
         wait until falling_edge(clk);
-        assert ReadData = x"00000000" & TEST_DATA(7 downto 0) 
-            report "Read data after SW is incorrect" severity FAILURE;
+        assert ReadData = x"000000" & TEST_DATA(7 downto 0) 
+            report "Read data after SB is incorrect" severity FAILURE;
         report "SB test passed!" severity NOTE;
 
         std.env.stop(0);
