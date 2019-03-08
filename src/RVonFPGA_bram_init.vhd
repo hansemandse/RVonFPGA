@@ -11,7 +11,7 @@
 --              : This entity represents a block-RAM of variable size used in the data memory
 --              : and the instruction memory of the pipeline
 --              |
--- Revision     : 1.0   (last updated March 4, 2019)
+-- Revision     : 1.0   (last updated March 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,9 +23,12 @@ use IEEE.numeric_std.all;
 use IEEE.math_real.all;
 use std.textio.all;
 
+library work;
+use work.includes.all;
+
 entity bram_init is
     generic (
-        DATA_WIDTH : natural := 8;
+        DATA_WIDTH : natural := BYTE_WIDTH;
         ADDR_WIDTH : natural := 9;
         TEST_FILE : string;
         NO_RAMS, RAM_NO : integer

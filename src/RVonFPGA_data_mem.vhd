@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This entity represents the data memory of the pipeline.
 --              |
--- Revision     : 1.1   (last updated February 25, 2019)
+-- Revision     : 1.1   (last updated March 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -26,8 +26,8 @@ use work.includes.all;
 
 entity data_mem is
     generic (
-        BLOCK_WIDTH : natural := 8;
-        ADDR_WIDTH : natural := 12
+        BLOCK_WIDTH : natural := BYTE_WIDTH;
+        ADDR_WIDTH : natural := DATA_ADDR_WIDTH
     );
     port (
         -- Control ports

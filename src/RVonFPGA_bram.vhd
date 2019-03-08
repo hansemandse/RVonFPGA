@@ -11,7 +11,7 @@
 --              : This entity represents a block-RAM of variable size used in the data memory
 --              : and the instruction memory of the pipeline
 --              |
--- Revision     : 1.0   (last updated February 10, 2019)
+-- Revision     : 1.0   (last updated March 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -21,9 +21,12 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
+library work;
+use work.includes.all;
+
 entity bram is
     generic (
-        DATA_WIDTH : natural := 8;
+        DATA_WIDTH : natural := BYTE_WIDTH;
         ADDR_WIDTH : natural := 9
     );
     port (

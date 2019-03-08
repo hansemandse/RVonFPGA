@@ -5,7 +5,7 @@ li  a1, 1
 nop
 nop
 nop
-add a2, a0, a1 # Expected value is 0x0123456789ABCDF0
+add a3, a0, a1 # Expected value is 0x0123456789ABCDF0
 nop
 nop
 nop
@@ -14,7 +14,7 @@ nop
 nop
 nop
 add a2, a0, a1 # Expected value is 0x0123456789ABCDF0
-add a3, a1, a2 # Expected value is 0x0123456789ABCDF1
+add a4, a1, a2 # Expected value is 0x0123456789ABCDF1
 nop
 nop
 nop
@@ -22,9 +22,9 @@ nop
 nop
 nop
 nop
-add a2, a0, a1 # Expected value is 0x0123456789ABCDF0
+add a2, a0, a0 # Expected value is 0x02468ACF13579BDE
 nop
-add a3, a0, a2 # Expected value is 0x013579BE02468ACE
+add a5, a0, a2 # Expected value is 0x0369D0369D0369CD
 nop
 nop
 nop
@@ -32,9 +32,9 @@ nop
 nop
 nop
 nop
-add a2, a0, a0 # Expected value is 0x02468ACF13579BDE
-add a3, a1, a1 # Expected value is 0x0000000000000002
-add a4, a2, a3 # Expected value is 0x02468ACF13579BE0
+add a2, a1, a1 # Expected value is 0x0000000000000002
+add a6, a2, a0 # Expected value is 0x0123456789ABCDF1
+add a7, a6, a2 # Expected value is 0x0123456789ABCDF3
 nop
 nop
 nop

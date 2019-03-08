@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This entity represents the instruction memory of the pipeline.
 --              |
--- Revision     : 1.0   (last updated February 28, 2019)
+-- Revision     : 1.0   (last updated March 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -26,18 +26,20 @@ use work.includes.all;
 
 entity instr_mem is
     generic (
-        BLOCK_WIDTH : natural := 8;
+        BLOCK_WIDTH : natural := BYTE_WIDTH;
         ADDR_WIDTH : natural := PC_WIDTH;
-        TEST_FILE : string := "../tests/add.bin"
+        TEST_FILE : string := TEST_FILE
     );
     port (
         -- Control ports
         MemWrite, clk, reset : in std_logic;
         ImemOp : in imem_op_t;
-        -- Data port
-        Address : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-        WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
-        ReadData : out std_logic_vector(31 downto 0)
+        -- Read port
+        ReadAddress : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+        ReadData : out std_logic_vector(31 downto 0);
+        -- Write port
+        WriteAddress : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+        WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
     );
 end instr_mem;
 
@@ -57,7 +59,7 @@ architecture rtl of instr_mem is
 
     -- Array for storing addresses for the internal block RAMs
     type addr_a_t is array(NB_COL-1 downto 0) of std_logic_vector(ADDR_WIDTH_INT-1 downto 0);
-    signal AddrArray : addr_a_t;
+    signal RAddrArray, WAddrArray : addr_a_t;
 
     -- Array for storing individual bytes to be written to block RAM
     type data_a_t is array(NB_COL-1 downto 0) of std_logic_vector(BLOCK_WIDTH-1 downto 0);
@@ -75,7 +77,7 @@ architecture rtl of instr_mem is
             -- Control ports
             we, clk, reset : in std_logic;
             -- Data ports
-            addr : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            raddr, waddr : in std_logic_vector(ADDR_WIDTH-1 downto 0);
             data_in : in std_logic_vector(DATA_WIDTH-1 downto 0);
             data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
         );
@@ -89,7 +91,14 @@ begin
         process (all)
             variable LowerBits : integer;
         begin
-            LowerBits := to_integer(unsigned(Address(NB_LOG-1 downto 0)));
+            -- Firstly, managing writes to the block RAMs
+            LowerBits := to_integer(unsigned(WriteAddress(NB_LOG-1 downto 0)));
+            -- Delivering write addresses to the block RAMs
+            if (LowerBits > i) then
+                WAddrArray(i) <= std_logic_vector(unsigned(WriteAddress(ADDR_WIDTH-1 downto NB_LOG)) + 1);
+            else
+                WAddrArray(i) <= std_logic_vector(unsigned(WriteAddress(ADDR_WIDTH-1 downto NB_LOG)));
+            end if;
 
             -- Data is stored little endian and data in is wrapped around 
             -- Delivering data to the block RAMs
@@ -122,15 +131,14 @@ begin
             else
                 WEArray(i) <= '0';
             end if;
-
-            -- Delivering addresses to the block RAMs (implement this in a smart way, such that
-            -- instructions are not necessarily fetched at every cycle)
+            
+            -- Secondly, managing reads from the block RAMs
+            LowerBits := to_integer(unsigned(ReadAddress(NB_LOG-1 downto 0)));
+            -- Delivering read addresses to the block RAMs
             if (LowerBits > i) then
-                -- Address should be one higher
-                AddrArray(i) <= std_logic_vector(unsigned(Address(ADDR_WIDTH-1 downto NB_LOG)) + 1);
+                RAddrArray(i) <= std_logic_vector(unsigned(ReadAddress(ADDR_WIDTH-1 downto NB_LOG)) + 1);
             else
-                -- Address is simply the given address divived by number of columns
-                AddrArray(i) <= Address(ADDR_WIDTH-1 downto NB_LOG);
+                RAddrArray(i) <= ReadAddress(ADDR_WIDTH-1 downto NB_LOG);
             end if;
         end process;
     end generate gen_control;
@@ -152,7 +160,7 @@ begin
             if (reset = '1') then
                 Address_p <= (others => '0');
             else
-                Address_p <= Address;
+                Address_p <= ReadAddress;
             end if;
         end if;
     end process reg;
@@ -168,7 +176,8 @@ begin
             clk => clk,
             reset => reset,
             we => WEArray(i),
-            addr => AddrArray(i),
+            raddr => RAddrArray(i),
+            waddr => WAddrArray(i),
             data_in => DataInArray(i),
             data_out => DataOutArray(i)
         );
