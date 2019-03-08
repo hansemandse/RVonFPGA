@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 1.0   (last updated March 8, 2019)
+-- Revision     : 1.1   (last updated March 8, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -57,11 +57,14 @@ architecture rtl of pipeline is
     signal MEMWB, MEMWB_next : MEMWB_t;
 
     -- Signals for the ID stage
+    signal IReadAddr : std_logic_vector(PC_WIDTH-1 downto 0);
+
+    -- Signals for the ID stage
     signal IReadData, Instruction : std_logic_vector(31 downto 0);
     signal opcode, funct7 : std_logic_vector(6 downto 0);
     signal funct3 : std_logic_vector(2 downto 0);
     signal rs1, rs2, rd : std_logic_vector(4 downto 0);
-    signal IFIDWrite, PCWrite, InsertNOP : std_logic;
+    signal PCWrite, InsertNOP : std_logic;
 
     -- Signals for the EX stage
     signal Zero, LessThanU, LessThan : std_logic;
@@ -132,7 +135,17 @@ begin
     -- Output to ensure synthesis does not remove all components
     OWriteData <= WriteData;
 
+    -- Signals for the IF stage
+    -- The read address is usually just the PC, but when a load-use hazard occurs,
+    -- it is preferable to forward in IDEX.PCp4 (which is one instruction behind the
+    -- current PC) such that only one clock cycle is wasted rather than updating the
+    -- PC with a lower value such that two clock cycles are wasted.
+    IReadAddr <= pc when (PCWrite = '1') else IDEX.PCp4;
+
     -- Signals for the ID stage
+    -- The instructions after a branch are avoided in two steps; the first subsequent
+    -- instruction is avoided by zeroing all of its control signals; the second
+    -- instruction is simply replaced by a hardcoded NOP (see Includes).
     Instruction <= IReadData when (IFID.SkipInstr = '0') else NOP;
     opcode <= Instruction(6 downto 0);
     rd <= Instruction(11 downto 7);
@@ -159,7 +172,7 @@ begin
         clk => clk,
         reset => reset,
         ImemOp => ImemOp,
-        ReadAddress => pc,
+        ReadAddress => IReadAddr,
         ReadData => IReadData,
         WriteAddress => IWriteAddress,
         WriteData => IWriteData
@@ -252,7 +265,7 @@ begin
                 end if;
             when "0100011" => -- store instructions
                 IDEX_next.Immediate <= (others => Instruction(31));
-                IDEX_next.Immediate(10 downto 0) <= Instruction(30 downto 25) & Instruction(4 downto 0);
+                IDEX_next.Immediate(10 downto 0) <= Instruction(30 downto 25) & Instruction(11 downto 7);
             when "0011011" => -- immediate word instructions
                 if (funct3 = "000") then
                     -- instruction is an ADDIW
@@ -268,13 +281,13 @@ begin
         end case imm;
 
         -- Hazard detection
+        -- Note that PCWrite = '0' means that the read address to the instruction memory
+        -- will be IDEX.PCp4 rather than PC such that only a single clock cycle is wasted.
         if (IDEX.M.MemRead = '1' and (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
             PCWrite <= '0';
-            IFIDWrite <= '0';
             InsertNOP <= '1';
         else
             PCWrite <= '1';
-            IFIDWrite <= '1';
             InsertNOP <= '0';
         end if;
 
@@ -290,17 +303,20 @@ begin
                 -- AUIPC adds a large immediate to the PC
                 IDEX_next.EX.ALUSrcA <= '1';
                 IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.EX.ALUOp <= ALU_ADD;
                 IDEX_next.WB.RegWrite <= '1';
             when "1101111" => -- JAL
                 -- JAL performs an unconditional branch
                 IDEX_next.EX.ALUSrcA <= '1';
                 IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.EX.ALUOp <= ALU_ADD;
                 IDEX_next.EX.Branch <= BR_J;
                 IDEX_next.WB.MemtoReg <= WB_PCp4;
                 IDEX_next.WB.RegWrite <= '1';
             when "1100111" => -- JALR
                 -- JALR performs an unconditional branch
                 IDEX_next.EX.ALUSrcB <= '1';
+                IDEX_next.EX.ALUOp <= ALU_ADD;
                 IDEX_next.EX.Branch <= BR_JR;
                 IDEX_next.WB.MemtoReg <= WB_PCp4;
                 IDEX_next.WB.RegWrite <= '1';
@@ -681,13 +697,13 @@ begin
                 else
                     pc <= pc;
                 end if;
-                if (IFIDWrite = '1') then
-                    IFID <= IFID_next;
-                else
-                    IFID <= IFID;
-                end if;
+                IFID <= IFID_next;
+                -- Zero control signals in case of branch taken
                 if (InsertNOP = '1') then
-                    IDEX <= IDEX_reset;
+                    IDEX <= IDEX_next;
+                    IDEX.EX <= EX_reset;
+                    IDEX.M <= M_reset;
+                    IDEX.WB <= WB_reset;
                 else
                     IDEX <= IDEX_next;
                 end if;

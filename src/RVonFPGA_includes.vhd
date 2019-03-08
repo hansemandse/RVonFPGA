@@ -11,7 +11,7 @@
 --              : This file contains all of the type definitions required in the pipeline
 --              : and in the memories.
 --              |
--- Revision     : 1.2   (last updated March 7, 2019)
+-- Revision     : 1.2   (last updated March 8, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -30,10 +30,11 @@ package includes is
     constant DATA_WIDTH : natural := 64;
     constant PC_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '0');
     constant PCp4_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (2 => '1', others => '0');
+    -- Hardcoded NOP instruction (ADDI x0, x0, 0) used for branching
     constant NOP : std_logic_vector(31 downto 0) := x"00000013";
 
     -- Test file for the instruction memory and for simulation of the pipeline
-    constant TEST_FILE : string := "../tests/s_tests/test_beq.bin";
+    constant TEST_FILE : string := "../tests/s_tests/test_load.bin";
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;
