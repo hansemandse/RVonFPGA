@@ -11,7 +11,7 @@
 --              : This file contains all of the type definitions required in the pipeline
 --              : and in the memories.
 --              |
--- Revision     : 1.2   (last updated March 8, 2019)
+-- Revision     : 1.2   (last updated March 12, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,7 +23,16 @@ use IEEE.numeric_std.all;
 use std.textio.all;
 
 package includes is
-    -- Relevant constants
+    -- Clock divider relevant constants
+    constant CLOCK_F : natural := 100_000_000;
+    constant CLOCK_DIV : natural := 8;
+    constant CLOCK_F_INT : natural := CLOCK_F / CLOCK_DIV;
+
+    -- Communication relevant constants
+    constant BAUD_RATE : natural := 115200; -- Used in course 02203 at DTU
+
+    -- Pipeline relevant constants
+    constant RF_ADDR_WIDTH : natural := 5;
     constant BYTE_WIDTH : natural := 8;
     constant DATA_ADDR_WIDTH : natural := 12;
     constant PC_WIDTH : natural := 12;

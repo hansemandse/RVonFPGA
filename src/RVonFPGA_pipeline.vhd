@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 1.1   (last updated March 8, 2019)
+-- Revision     : 1.1   (last updated March 10, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -30,13 +30,15 @@ entity pipeline is
     port (
         -- Input ports
         clk, reset : in std_logic;
-        -- Inputs to the instruction memory (hopefully from a UART controller at some point)
+        -- Inputs to the instruction memory
         IMemWrite : in std_logic;
         ImemOp : in imem_op_t;
         IWriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
         IWriteAddress : in std_logic_vector(PC_WIDTH-1 downto 0);
-        -- Output ports
-        OWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0)
+        -- Inputs to the register file
+        RFRs : in std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
+        -- Output from the register file
+        RFData : out std_logic_vector(DATA_WIDTH-1 downto 0)
     );
 end pipeline;
 
@@ -78,7 +80,7 @@ architecture rtl of pipeline is
     -- Register file component declaration
     component register_file is
         generic (
-            ADDR_WIDTH : natural := 5
+            ADDR_WIDTH : natural := RF_ADDR_WIDTH
         );
         port (
             -- Control ports
@@ -91,7 +93,10 @@ architecture rtl of pipeline is
             Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
             -- Write port
             RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- UART read port
+            UARTRs : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            UARTData : out std_logic_vector(DATA_WIDTH-1 downto 0)
         );
     end component;
 
@@ -132,9 +137,6 @@ architecture rtl of pipeline is
         );
     end component;
 begin
-    -- Output to ensure synthesis does not remove all components
-    OWriteData <= WriteData;
-
     -- Signals for the IF stage
     -- The read address is usually just the PC, but when a load-use hazard occurs,
     -- it is preferable to forward in IDEX.PCp4 (which is one instruction behind the
@@ -163,7 +165,9 @@ begin
         RegisterRd => MEMWB.RegisterRd,
         Data1 => IDEX_next.Data1,
         Data2 => IDEX_next.Data2,
-        WriteData => WriteData
+        WriteData => WriteData,
+        UARTRs => RFRs,
+        UARTData => RFData
     );
 
     im : instr_mem

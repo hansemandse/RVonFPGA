@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This is a testbench for the instruction memory;
 --              |
--- Revision     : 1.0   (last updated February 22, 2019)
+-- Revision     : 1.0   (last updated March 8, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -29,6 +29,9 @@ end instr_mem_tb;
 architecture rtl of instr_mem_tb is
     -- Clock period in ns
     constant clk_p : time := 10 ns;
+
+    -- Instruction count in the test file
+    constant instr_count : natural := get_instr_count(TEST_FILE);
 
     -- Random start address for the system
     constant SD_ADDR : std_logic_vector(PC_WIDTH-1 downto 0) 
@@ -52,7 +55,7 @@ architecture rtl of instr_mem_tb is
         generic (
             BLOCK_WIDTH : natural := 8;
             ADDR_WIDTH : natural := PC_WIDTH;
-            TEST_FILE : string := "../tests/add.bin"
+            TEST_FILE : string := TEST_FILE
         );
         port (
             -- Control ports
@@ -86,12 +89,21 @@ begin
     stimuli : process is
         variable ExpectedRes : std_logic_vector(31 downto 0);
     begin
+        reset <= '1';
+        wait until falling_edge(clk);
+        reset <= '0';
         wait until falling_edge(clk);
         -- Running through all of the relevant array positions to read all instructions
-        for i in 0 to 20 loop
+        for i in 0 to instr_count+3 loop
             ReadAddress <= std_logic_vector(to_unsigned(i*4, PC_WIDTH));
             wait until falling_edge(clk);
         end loop;
+
+        -- Testing the read functionality on address jumps
+        ReadAddress <= (others => '0');
+        wait until falling_edge(clk);
+        ReadAddress <= (3 downto 2 => '1', others => '0');
+        wait until falling_edge(clk);
 
         -- Testing the SD functionality
         MemWrite <= '1';

@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This entity represents the instruction memory of the pipeline.
 --              |
--- Revision     : 1.0   (last updated March 7, 2019)
+-- Revision     : 1.1   (last updated March 8, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -47,11 +47,14 @@ architecture rtl of instr_mem is
     -- Number of RAM blocks to be implemented
     constant NB_COL : integer := DATA_WIDTH / BLOCK_WIDTH;
     constant NB_LOG : natural := natural(log2(real(NB_COL)));
+
     -- Address width for the internal block RAMs
     constant ADDR_WIDTH_INT : natural := ADDR_WIDTH - NB_LOG;
 
     -- Signal for the pipelined control
-    signal Address_p : std_logic_vector(ADDR_WIDTH-1 downto 0);
+    signal Address_p : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
+    signal UseBuf : std_logic;
+    signal IBuf, IBuf_next : std_logic_vector(4*BLOCK_WIDTH-1 downto 0) := (others => '0');
 
     -- Array for storing byte-wide write enables for the internal block RAMs
     type we_t is array(NB_COL-1 downto 0) of std_logic;
@@ -147,11 +150,20 @@ begin
         variable LowerBits : integer;
     begin
         LowerBits := to_integer(unsigned(Address_p(NB_LOG-1 downto 0)));
+        -- Updating the instruction buffer
+        IBuf_next <= DataOutArray(to_integer(to_unsigned(LowerBits+7, NB_LOG))) 
+                  & DataOutArray(to_integer(to_unsigned(LowerBits+6, NB_LOG))) 
+                  & DataOutArray(to_integer(to_unsigned(LowerBits+5, NB_LOG))) 
+                  & DataOutArray(to_integer(to_unsigned(LowerBits+4, NB_LOG)));
         -- This memory constantly outputs a single instruction
-        ReadData(BLOCK_WIDTH-1 downto 0) <= DataOutArray(LowerBits);
-        ReadData(2*BLOCK_WIDTH-1 downto BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG)));
-        ReadData(3*BLOCK_WIDTH-1 downto 2*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+2, NB_LOG)));
-        ReadData(4*BLOCK_WIDTH-1 downto 3*BLOCK_WIDTH) <= DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG)));
+        if (UseBuf = '1') then
+            ReadData <= IBuf;
+        else
+            ReadData <= DataOutArray(to_integer(to_unsigned(LowerBits+3, NB_LOG))) 
+                    & DataOutArray(to_integer(to_unsigned(LowerBits+2, NB_LOG))) 
+                    & DataOutArray(to_integer(to_unsigned(LowerBits+1, NB_LOG))) 
+                    & DataOutArray(LowerBits);
+        end if;
     end process gen_out;
 
     reg : process (all)
@@ -159,8 +171,19 @@ begin
         if (rising_edge(clk)) then
             if (reset = '1') then
                 Address_p <= (others => '0');
+                IBUF <= (others => '0');
+                UseBuf <= '0';
             else
                 Address_p <= ReadAddress;
+                if (Address_p(2) = '0') then
+                    IBUF <= IBUF_next;
+                end if;
+                if (ReadAddress(ADDR_WIDTH-1 downto NB_LOG) = Address_p(ADDR_WIDTH-1 downto NB_LOG) 
+                                                          and ReadAddress(2) = '1') then
+                    UseBuf <= '1';
+                else
+                    UseBuf <= '0';
+                end if;
             end if;
         end if;
     end process reg;

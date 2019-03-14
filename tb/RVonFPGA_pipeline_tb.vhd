@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This is a testbench for the pipeline.
 --              |
--- Revision     : 1.0   (last updated March 7, 2019)
+-- Revision     : 1.1   (last updated March 10, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -39,20 +39,21 @@ architecture rtl of pipeline_tb is
     signal ImemOp : imem_op_t := MEM_NOP;
     signal IWriteData : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
     signal IWriteAddress : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '0');
-    signal OWriteData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
     -- Pipeline component declaration
     component pipeline is
         port (
             -- Input ports
             clk, reset : in std_logic;
-            -- Inputs to the instruction memory (hopefully from a UART controller at some point)
+            -- Inputs to the instruction memory
             IMemWrite : in std_logic;
             ImemOp : in imem_op_t;
             IWriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
             IWriteAddress : in std_logic_vector(PC_WIDTH-1 downto 0);
-            -- Output ports
-            OWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0)
+            -- Inputs to the register file
+            RFRs : in std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
+            -- Outputs from the register file
+            RFData : out std_logic_vector(DATA_WIDTH-1 downto 0)
         );
     end component;
 begin
@@ -64,7 +65,8 @@ begin
         ImemOp => ImemOp,
         IWriteData => IWriteData,
         IWriteAddress => IWriteAddress,
-        OWriteData => OWriteData
+        RFRs => (others => '0'),
+        RFData => open
     );
 
     stimuli : process is

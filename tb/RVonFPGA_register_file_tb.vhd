@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This is a testbench for the register file.
 --              |
--- Revision     : 1.0   (last updated February 22, 2019)
+-- Revision     : 1.1   (last updated March 10, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -54,7 +54,10 @@ architecture rtl of register_file_tb is
             Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
             -- Write port
             RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
+            WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- UART read port
+            UARTRs : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            UARTData : out std_logic_vector(DATA_WIDTH-1 downto 0)
         );
     end component;
 begin
@@ -67,7 +70,9 @@ begin
         RegisterRd => rd,
         Data1 => Data1,
         Data2 => Data2,
-        WriteData => WriteData
+        WriteData => WriteData,
+        UARTRs => (others => '0'),
+        UARTData => open
     );
 
     -- Testing all types of memory operations - starting with a large write

@@ -11,7 +11,7 @@
 --              : This entity represents the register file in a classic RISC-V pipeline.
 --              : It has two read ports and one write port. 
 --              |
--- Revision     : 1.0   (last updated February 9, 2019)
+-- Revision     : 1.1   (last updated March 10, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -39,7 +39,10 @@ entity register_file is
         Data2 : out std_logic_vector(DATA_WIDTH-1 downto 0);
         -- Write port
         RegisterRd : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-        WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0)
+        WriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+        -- UART read port
+        UARTRs : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+        UARTData : out std_logic_vector(DATA_WIDTH-1 downto 0)
     );
 end register_file;
 
@@ -82,5 +85,8 @@ begin
             -- Output data from the register file
             Data2 <= regs(to_integer(unsigned(RegisterRs2)));
         end if;
+
+        -- Asynchronous read to the UART controller (controller only has access to stored data)
+        UARTData <= regs(to_integer(unsigned(UARTRs)));
     end process rf;
 end rtl;

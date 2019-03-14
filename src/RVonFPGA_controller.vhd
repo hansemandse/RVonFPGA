@@ -1,0 +1,19 @@
+-- *******************************************************************************************
+--              |
+-- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+--              |
+-- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
+--              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
+--              |
+-- Purpose      : This file is a part of a full system implemented as part of a bachelor's
+--              : thesis at DTU. The thesis is written in cooperation with the Institute
+--              : of Mathematics and Computer Science.
+--              : This entity represents the top entity interconnecting the pipeline, the
+--              : clock divider and the UART controller.
+--              |
+-- Revision     : 1.0   (last updated March 14, 2019)
+--              |
+-- Available at : https://github.com/hansemandse/RVonFPGA
+--              |
+-- *******************************************************************************************
+
