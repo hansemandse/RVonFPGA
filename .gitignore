@@ -1,4 +1,7 @@
 *.bin
 c_tests/*.s
 *.o
-/src_old
+/.vscode
+serial/*.spec
+serial/__pycache__
+serial/build

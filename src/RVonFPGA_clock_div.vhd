@@ -11,7 +11,7 @@
 --              : This entity represents the clock divider of the system. It is implemented
 --              : using a Xilinx PLLE2_BASE primitive.
 --              |
--- Revision     : 1.0   (last updated March 10, 2019)
+-- Revision     : 1.0   (last updated March 15, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,7 +23,7 @@ use IEEE.std_logic_1164.all;
 library UNISIM;
 use UNISIM.Vcomponents.all;
 
-entity clock_div is
+entity clock_divider is
     generic (
         DIV : natural := 1
     );
@@ -31,9 +31,9 @@ entity clock_div is
         clk_in, reset : in std_logic;
         clk_out : out std_logic
     );
-end clock_div;
+end clock_divider;
 
-architecture rtl of clock_div is
+architecture rtl of clock_divider is
     -- Multiplier for the clock divider
     constant MULT : natural := 8;
     constant DIV_S : natural := MULT * DIV;
@@ -55,7 +55,7 @@ begin
       BANDWIDTH => "OPTIMIZED",  -- OPTIMIZED, HIGH, LOW
       CLKFBOUT_MULT => MULT,     -- Multiply value for all CLKOUT, (2-64)
       CLKFBOUT_PHASE => 0.0,     -- Phase offset in degrees of CLKFB, (-360.000-360.000).
-      CLKIN1_PERIOD => 0.0,      -- Input clock period in ns to ps resolution (i.e. 33.333 is 30 MHz).
+      CLKIN1_PERIOD => 10.0,      -- Input clock period in ns to ps resolution (i.e. 33.333 is 30 MHz).
       -- CLKOUT0_DIVIDE - CLKOUT5_DIVIDE: Divide amount for each CLKOUT (1-128)
       CLKOUT0_DIVIDE => DIV_S,
       CLKOUT1_DIVIDE => 1,
