@@ -9,3 +9,4 @@ add a2, a0, a1 # Expected result is 0x0102030405060709
 nop
 nop
 nop
+ecall

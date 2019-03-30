@@ -14,7 +14,7 @@
 --              : it makes sure to fill out the entire instruction memory, once it starts
 --              : downloading a test program.
 --              |
--- Revision     : 1.0   (last updated March 18, 2019)
+-- Revision     : 1.0   (last updated March 25, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -36,6 +36,7 @@ architecture rtl of controller_tb is
     -- Testing relevant constants
     constant UPLOAD_C : std_logic_vector(BYTE_WIDTH-1 downto 0) := x"72";
     constant DOWNLOAD_C : std_logic_vector(BYTE_WIDTH-1 downto 0) := x"77";
+    constant RUN_C : std_logic_vector(BYTE_WIDTH-1 downto 0) := x"52";
     constant TEST_DW : std_logic_vector(DATA_WIDTH-1 downto 0) := x"0102030405060708";
     type register_file_t is array(0 to 2**RF_ADDR_WIDTH-1) of std_logic_vector(DATA_WIDTH-1 downto 0);
     constant TEST_RF : register_file_t := (TEST_DW, x"0101010101010101", x"0202020202020202", 
@@ -51,7 +52,7 @@ architecture rtl of controller_tb is
                                x"1E1E1E1E1E1E1E1E", x"1F1F1F1F1F1F1F1F");
 
     -- Signals for interfacing the controller
-    signal clk, reset, ImemWrite : std_logic := '0';
+    signal clk, reset, ImemWrite, pipcont : std_logic := '0';
     signal data_stream_out_stb, data_stream_out_ack, data_stream_in_stb : std_logic := '0';
     signal data_stream_out, data_stream_in : std_logic_vector(BYTE_WIDTH-1 downto 0) := (others => '0');
     signal RFRs : std_logic_vector(RF_ADDR_WIDTH-1 downto 0) := (others => '0');
@@ -80,7 +81,9 @@ architecture rtl of controller_tb is
             ImemWrite : out std_logic;
             ImemOp : out imem_op_t;
             IWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            IWriteAddress : out std_logic_vector(IMEM_ADDR_WIDTH-1 downto 0)
+            IWriteAddress : out std_logic_vector(IMEM_ADDR_WIDTH-1 downto 0);
+            -- Interface to the pipeline
+            pipcont : out std_logic
         );
     end component;
 begin
@@ -98,7 +101,8 @@ begin
         ImemWrite => ImemWrite,
         ImemOp => ImemOp,
         IWriteData => IWriteData,
-        IWriteAddress => IWriteAddress
+        IWriteAddress => IWriteAddress,
+        pipcont => pipcont
     );
     RFData <= TEST_RF(to_integer(unsigned(RFRs)));
 
@@ -107,13 +111,8 @@ begin
     begin
         reset <= '1';
         wait until falling_edge(clk);
-
-        -- Controller enters the clear state (clears the entire memory)
         reset <= '0';
         wait until falling_edge(clk);
-        while ImemWrite = '1' loop
-            wait until falling_edge(clk);
-        end loop;
         -- Controller enters the command state and it is ready to receive data
 
         -- Bring controller into the download state
@@ -146,7 +145,7 @@ begin
         end loop;
         -- Controller enters the command state again
         
-        -- Bring controller into the uplaod state
+        -- Bring controller into the upload state
         data_stream_in <= UPLOAD_C;
         wait until falling_edge(clk);
         -- Test reading out all data from the register file (here simulated as TEST_RF)
@@ -160,6 +159,14 @@ begin
             -- Skip over the upload_check state
             wait until falling_edge(clk);
         end loop upload;
+        -- Controller enters the command state again
+
+        -- Bring controller into the run state
+        data_stream_in <= RUN_C;
+        wait until falling_edge(clk);
+        -- Test that the pipcont output is indeed '1'
+        assert pipcont = '1' report "The pipeline control output is incorrect!" severity FAILURE;
+        wait until falling_edge(clk);
         -- Controller enters the command state again
 
         std.env.stop(0);

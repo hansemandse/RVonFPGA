@@ -11,7 +11,7 @@
 --              : This entity represents the top entity interconnecting the pipeline, the
 --              : clock divider and the UART controller.
 --              |
--- Revision     : 1.0   (last updated March 14, 2019)
+-- Revision     : 1.0   (last updated March 25, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -27,6 +27,7 @@ use work.includes.all;
 entity top is
     port (
         clk, reset : in std_logic;
+        pc_out : out std_logic_vector(PC_WIDTH-1 downto 0);
         -- Serial communication with a PC
         serial_tx : out std_logic;
         serial_rx : in std_logic
@@ -35,7 +36,7 @@ end top;
 
 architecture rtl of top is
     -- Signals for interconnecting the components
-    signal clk_int, ImemWrite : std_logic;
+    signal clk_int, ImemWrite, pipcont : std_logic;
     signal ImemOp : imem_op_t;
     signal IWriteData, RFData : std_logic_vector(DATA_WIDTH-1 downto 0);
     signal IWriteAddress : std_logic_vector(PC_WIDTH-1 downto 0);
@@ -48,7 +49,9 @@ architecture rtl of top is
     component pipeline
         port (
             -- Input ports
-            clk, reset : in std_logic;
+            clk, reset, pipcont : in std_logic;
+            -- Output of the PC to indicate progress on LEDs
+            pc_out : out std_logic_vector(PC_WIDTH-1 downto 0);
             -- Inputs to the instruction memory
             IMemWrite : in std_logic;
             ImemOp : in imem_op_t;
@@ -112,7 +115,9 @@ architecture rtl of top is
             ImemWrite : out std_logic;
             ImemOp : out imem_op_t;
             IWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0);
-            IWriteAddress : out std_logic_vector(IMEM_ADDR_WIDTH-1 downto 0)
+            IWriteAddress : out std_logic_vector(IMEM_ADDR_WIDTH-1 downto 0);
+            -- Interface to the pipeline
+            pipcont : out std_logic
         );
     end component;
 begin
@@ -120,6 +125,8 @@ begin
     port map(
         clk => clk_int,
         reset => reset,
+        pipcont => pipcont,
+        pc_out => pc_out,
         ImemWrite => ImemWrite,
         ImemOp => ImemOp,
         IWriteData => IWriteData,
@@ -162,6 +169,7 @@ begin
         ImemWrite => ImemWrite,
         ImemOp => ImemOp,
         IWriteData => IWriteData,
-        IWriteAddress => IWriteAddress
+        IWriteAddress => IWriteAddress,
+        pipcont => pipcont
     );
 end rtl;

@@ -11,7 +11,7 @@
 --              : This file contains all of the type definitions required in the pipeline
 --              : and in the memories.
 --              |
--- Revision     : 1.2   (last updated March 12, 2019)
+-- Revision     : 1.2   (last updated March 24, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -25,7 +25,7 @@ use std.textio.all;
 package includes is
     -- Clock divider relevant constants
     constant CLOCK_F : natural := 100_000_000;
-    constant CLOCK_DIV : natural := 8;
+    constant CLOCK_DIV : natural := 2;
     constant CLOCK_F_INT : natural := CLOCK_F / CLOCK_DIV;
 
     -- Communication relevant constants
@@ -39,11 +39,13 @@ package includes is
     constant DATA_WIDTH : natural := 64;
     constant PC_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '0');
     constant PCp4_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (2 => '1', others => '0');
+    constant PC_MAX : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '1');
     -- Hardcoded NOP instruction (ADDI x0, x0, 0) used for branching
     constant NOP : std_logic_vector(31 downto 0) := x"00000013";
 
     -- Test file for the instruction memory and for simulation of the pipeline
-    constant TEST_FILE : string := "../tests/s_tests/test_load.bin";
+    constant INIT_RAM : std_logic := '1';
+    constant TEST_FILE : string := "../tests/s_tests/test_add.bin";
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;
@@ -148,6 +150,9 @@ package body includes is
         variable c_buf : character;
         variable index : natural := 0;
     begin
+        if (f = "") then
+            return 0;
+        end if;
         while (not endfile(file_in)) loop
             readline(file_in, c_line);
             while (c_line'length > 0) loop

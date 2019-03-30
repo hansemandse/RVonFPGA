@@ -31,3 +31,7 @@ ld a4, 0(sp) # Expected result 0x010203040A0C0EFE
 nop
 andi a5, a4, 0xF0 # Expected result 0x00000000000000F0
 addi sp, sp, 8 # Restore stack pointer
+nop
+nop
+nop
+ecall

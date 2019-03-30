@@ -38,3 +38,4 @@ add a7, a6, a2 # Expected value is 0x0123456789ABCDF3
 nop
 nop
 nop
+ecall

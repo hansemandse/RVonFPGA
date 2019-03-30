@@ -4,6 +4,7 @@
  #APP
 	li sp, 0x800
 	j main
+	ecall
  #NO_APP
 	.align	2
 	.globl	add

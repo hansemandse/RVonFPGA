@@ -35,7 +35,8 @@ architecture rtl of pipeline_tb is
 
     -- Signals for interfacing the pipeline (it will likely be more interesting to
     -- look into the register file in simulation than these)
-    signal clk, reset, IMemWrite : std_logic := '0';
+    signal clk, reset, IMemWrite, pipcont : std_logic := '0';
+    signal pc_out : std_logic_vector(PC_WIDTH-1 downto 0);
     signal ImemOp : imem_op_t := MEM_NOP;
     signal IWriteData : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
     signal IWriteAddress : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '0');
@@ -44,7 +45,9 @@ architecture rtl of pipeline_tb is
     component pipeline is
         port (
             -- Input ports
-            clk, reset : in std_logic;
+            clk, reset, pipcont : in std_logic;
+            -- Output ports
+            pc_out : out std_logic_vector(PC_WIDTH-1 downto 0);
             -- Inputs to the instruction memory
             IMemWrite : in std_logic;
             ImemOp : in imem_op_t;
@@ -61,6 +64,8 @@ begin
     port map (
         clk => clk,
         reset => reset,
+        pipcont => pipcont,
+        pc_out => pc_out,
         ImemWrite => ImemWrite,
         ImemOp => ImemOp,
         IWriteData => IWriteData,

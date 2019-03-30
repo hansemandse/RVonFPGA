@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 1.1   (last updated March 10, 2019)
+-- Revision     : 1.1   (last updated March 25, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -29,7 +29,9 @@ use work.includes.all;
 entity pipeline is
     port (
         -- Input ports
-        clk, reset : in std_logic;
+        clk, reset, pipcont : in std_logic;
+        -- Output of the PC to indicate progress on LEDs
+        pc_out : out std_logic_vector(PC_WIDTH-1 downto 0);
         -- Inputs to the instruction memory
         IMemWrite : in std_logic;
         ImemOp : in imem_op_t;
@@ -137,6 +139,7 @@ architecture rtl of pipeline is
         );
     end component;
 begin
+    pc_out <= pc;
     -- Signals for the IF stage
     -- The read address is usually just the PC, but when a load-use hazard occurs,
     -- it is preferable to forward in IDEX.PCp4 (which is one instruction behind the
@@ -670,7 +673,12 @@ begin
                     pc_next <= pc_inc;
                 end if;
             when others => -- NOP
-                pc_next <= pc_inc;
+                if (pc /= PC_MAX and opcode /= "1110011") then
+                    -- If an ECALL is in the ID-stage, stop the execution
+                    pc_next <= pc_inc;
+                else
+                    pc_next <= pc;
+                end if;
         end case br;
 
         -- Determining the data to write back
@@ -689,7 +697,7 @@ begin
     regs: process (all)
     begin
         if (rising_edge(clk)) then
-            if (reset = '1') then
+            if (reset = '1' or pipcont = '1') then
                 pc <= (others => '0');
                 IFID <= IFID_reset;
                 IDEX <= IDEX_reset;

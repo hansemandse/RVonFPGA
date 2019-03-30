@@ -11,7 +11,7 @@
 --              : This entity represents a block-RAM of variable size used in the data memory
 --              : and the instruction memory of the pipeline
 --              |
--- Revision     : 1.0   (last updated March 7, 2019)
+-- Revision     : 1.0   (last updated March 24, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -58,6 +58,9 @@ architecture rtl of bram_init is
         variable index : natural := 0;
         variable res : ram_t := (others => (others => '0'));
     begin
+        if (INIT_RAM = '0') then
+            return res;
+        end if;
         -- Read all lines of the file and convert the characters to 8-bit std_logic_vectors
         -- such that they may be stored in the memory
         while (not endfile(file_in) and index < MEM_SIZE) loop

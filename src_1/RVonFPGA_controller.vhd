@@ -12,7 +12,7 @@
 --              : by an implementation of a similar component by Luca Pezzarossa in course
 --              : 02203 at DTU, see https://github.com/lucapezza/02203-serial-interface
 --              |
--- Revision     : 1.0   (last updated March 17, 2019)
+-- Revision     : 1.0   (last updated March 25, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -45,7 +45,9 @@ entity controller is
         ImemWrite : out std_logic;
         ImemOp : out imem_op_t;
         IWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0);
-        IWriteAddress : out std_logic_vector(IMEM_ADDR_WIDTH-1 downto 0)
+        IWriteAddress : out std_logic_vector(IMEM_ADDR_WIDTH-1 downto 0);
+        -- Interface to the pipeline
+        pipcont : out std_logic
     );
 end entity;
 
@@ -59,14 +61,15 @@ architecture rtl of controller is
     constant UPLOAD_C : std_logic_vector(7 downto 0) := x"72"; -- Character is ASCII 'r'
     constant DOWNLOAD_C : std_logic_vector(7 downto 0) := x"77"; -- Character is ASCII 'w'
     constant CLEAR_C : std_logic_vector(7 downto 0) := x"63"; -- Character is ASCII 'c'
+    constant RUN_C : std_logic_vector(7 downto 0) := x"52"; -- Character is ASCII 'R'
     constant REPLY_C : std_logic_vector(7 downto 0) := x"79"; -- Character is ASCII 'y'
 
     -- Counter for addressing the data buffer
-    signal count, count_next : integer range 0 to DATA_WIDTH/BYTE_WIDTH-1 := 0;
+    signal count, count_next : integer := 0;
 
     -- State type and related signals for the FSM
     type state_type is (start, clear, command, test, download, download_store,
-                        upload, upload_check);
+                        upload, upload_check, run);
     signal State, State_next : state_type := start;
 
     -- Signals for addressing the instruction memory
@@ -97,6 +100,7 @@ begin
         data_stream_out_stb <= '0';
         ImemWrite <= '0';
         ImemOp <= MEM_NOP;
+        pipcont <= '0';
 
         -- Updating buffers, outputs and register values depending on the state
         case (State) is
@@ -105,7 +109,7 @@ begin
                 DataBuf_next <= (others => '0');
                 IAddr_next <= (others => '0');
                 RFAddr_next <= (others => '0');
-                State_next <= clear;
+                State_next <= command;
             when command =>
                 if (data_stream_in_stb = '0') then
                     -- No data to read, standby
@@ -113,25 +117,29 @@ begin
                 else
                     -- The following code is based on control characters sent by the
                     -- controller program on the PC. Read the character and take action
-                    if (data_stream_in = TEST_C) then
-                        -- Test the connection to the UART
-                        State_next <= test;
-                    elsif (data_stream_in = UPLOAD_C) then
-                        -- Start upload of data from the FPGA to the PC
-                        State_next <= upload;
-                        RFAddr_next <= (others => '0');
-                        count_next <= 0;
-                    elsif (data_stream_in = DOWNLOAD_C) then
-                        -- Start download of data from the PC to the FPGA
-                        State_next <= download;
-                        IAddr_next <= (others => '0');
-                        count_next <= 0;
-                    elsif (data_stream_in = CLEAR_C) then
-                        -- Clear the memory content
-                        State_next <= clear;
-                    else
-                        State_next <= command;
-                    end if;
+                    case (data_stream_in) is
+                        when TEST_C =>
+                            -- Test the connection to the UART
+                            State_next <= test;
+                        when UPLOAD_C =>
+                            -- Start upload of data from the FPGA to the PC
+                            State_next <= upload;
+                            RFAddr_next <= (others => '0');
+                            count_next <= 0;
+                        when DOWNLOAD_C =>
+                            -- Start download of data from the PC to the FPGA
+                            State_next <= download;
+                            IAddr_next <= (others => '0');
+                            count_next <= 0;
+                        when CLEAR_C =>
+                            -- Clear the memory content
+                            State_next <= clear;
+                        when RUN_C =>
+                            -- Reset the pipeline registers and the PC and start executing
+                            State_next <= run;
+                        when others =>
+                            State_next <= command;
+                    end case;
                 end if;
             when clear => 
                 -- Clear the entire instruction memory
@@ -204,13 +212,17 @@ begin
                         State_next <= upload;
                     end if;
                 end if;
-            when others => -- upload_check
+            when upload_check =>
                 if (unsigned(RFAddr) = RF_SIZE-1) then
                     State_next <= command;
                 else
                     RFAddr_next <= std_logic_vector(unsigned(RFAddr) + 1);
                     State_next <= upload;
                 end if;
+            when others => -- run
+                -- Reset the pipeline registers
+                pipcont <= '1';
+                State_next <= command;
         end case;
     end process comb;
 
