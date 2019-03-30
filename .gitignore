@@ -6,3 +6,4 @@ serial/*.spec
 serial/__pycache__
 serial/build
 serial/test.py
+*.exe
