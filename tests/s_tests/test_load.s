@@ -22,7 +22,7 @@ nop
 ld a2, 0(sp) # Expected result 0x010203040A0C0E00
 lb a3, 1(sp) # Expected result 0x000000000000000E
 ori a3, a3, 0xF0 # Expected result 0x00000000000000FE
-sb a3, 0(sp) # Expected result 0x010203040A0C0EFE
+sb a3, 0(sp) # Expected memory content 0x010203040A0C0EFE
 nop
 nop
 nop

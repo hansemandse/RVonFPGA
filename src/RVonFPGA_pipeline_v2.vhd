@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 1.1   (last updated March 25, 2019)
+-- Revision     : 2.0   (last updated March 30, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -54,6 +54,9 @@ architecture rtl of pipeline is
     -- Declarations for the IDEX register
     signal IDEX, IDEX_next : IDEX_t;
 
+    -- Declarations for the IDEX2 register
+    signal IDEX2, IDEX2_next : IDEX2_t;
+
     -- Declarations for the EXMEM register
     signal EXMEM, EXMEM_next : EXMEM_t;
 
@@ -68,7 +71,7 @@ architecture rtl of pipeline is
     signal opcode, funct7 : std_logic_vector(6 downto 0);
     signal funct3 : std_logic_vector(2 downto 0);
     signal rs1, rs2, rd : std_logic_vector(4 downto 0);
-    signal PCWrite, InsertNOP : std_logic;
+    signal PCWrite, InsertNOP, ZeroControl : std_logic;
 
     -- Signals for the EX stage
     signal Zero, LessThanU, LessThan : std_logic;
@@ -76,8 +79,11 @@ architecture rtl of pipeline is
     signal ALUOperand1, ALUOperand2, ALUResult, ALUOperand1m, ALUOperand2m
                                             : std_logic_vector(DATA_WIDTH-1 downto 0);
 
+    -- Signals for the MEM stage
+    signal MemData : std_logic_vector(DATA_WIDTH-1 downto 0);
+
     -- Signals for the WB stage
-    signal WriteData, MemData : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal WriteData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
     -- Register file component declaration
     component register_file is
@@ -145,7 +151,8 @@ begin
     -- it is preferable to forward in IDEX.PCp4 (which is one instruction behind the
     -- current PC) such that only one clock cycle is wasted rather than updating the
     -- PC with a lower value such that two clock cycles are wasted.
-    IReadAddr <= pc when (PCWrite = '1') else IDEX.PCp4;
+    IReadAddr <= pc when not(IDEX2.M.MemRead = '1' 
+              and (IDEX2.RegisterRd = rs1 or IDEX2.RegisterRd = rs2)) else IDEX.PCp4;
 
     -- Signals for the ID stage
     -- The instructions after a branch are avoided in two steps; the first subsequent
@@ -187,13 +194,13 @@ begin
 
     dm : data_mem
     port map (
-        MemRead => EXMEM.M.MemRead,
-        MemWrite => EXMEM.M.MemWrite,
-        MemOp => EXMEM.M.MemOp,
+        MemRead => IDEX2.M.MemRead,
+        MemWrite => IDEX2.M.MemWrite,
+        MemOp => IDEX2.M.MemOp,
         clk => clk,
         reset => reset,
-        Address => EXMEM.Result(DATA_ADDR_WIDTH-1 downto 0),
-        WriteData => EXMEM.Data,
+        Address => ALUResult(DATA_ADDR_WIDTH-1 downto 0),
+        WriteData => IDEX2.ALUOperand2m,
         ReadData => MemData
     );
 
@@ -230,16 +237,23 @@ begin
         IDEX_next.RegisterRs2 <= rs2;
         IDEX_next.RegisterRd <= rd;
 
+        -- Updating values of the IDEX2 register
+        IDEX2_next.EX2.ALUOp <= IDEX.EX.ALUOp;
+        IDEX2_next.EX2.Branch <= IDEX.EX.Branch;
+        IDEX2_next.M <= IDEX.M;
+        IDEX2_next.WB <= IDEX.WB;
+        IDEX2_next.PCp4 <= IDEX.PCp4;
+        IDEX2_next.RegisterRd <= IDEX.RegisterRd;
+
         -- Updating values of the EXMEM register
-        EXMEM_next.M <= IDEX.M;
-        EXMEM_next.WB <= IDEX.WB;
-        EXMEM_next.PCp4 <= IDEX.PCp4;
-        EXMEM_next.Data <= ALUOperand2m;
-        EXMEM_next.RegisterRd <= IDEX.RegisterRd;
+        EXMEM_next.WB <= IDEX2.WB;
+        EXMEM_next.PCp4 <= IDEX2.PCp4;
+        EXMEM_next.RegisterRd <= IDEX2.RegisterRd;
 
         -- Updating values of the MEMWB register
         MEMWB_next.WB <= EXMEM.WB;
         MEMWB_next.PCp4 <= EXMEM.PCp4;
+        MEMWB_next.ReadData <= MemData;
         MEMWB_next.Result <= EXMEM.Result;
         MEMWB_next.RegisterRd <= EXMEM.RegisterRd;
 
@@ -288,14 +302,19 @@ begin
         end case imm;
 
         -- Hazard detection
-        -- Note that PCWrite = '0' means that the read address to the instruction memory
-        -- will be IDEX.PCp4 rather than PC such that only a single clock cycle is wasted.
         if (IDEX.M.MemRead = '1' and (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
-            PCWrite <= '0';
+            -- Bring PC back to instruction after this one, flush the ID stage and the
+            -- following instruction
+            IFID_next.SkipInstr <= '1';
             InsertNOP <= '1';
-        else
             PCWrite <= '1';
+        elsif (IDEX2.M.MemRead = '1' and (IDEX2.RegisterRd = rs1 or IDEX2.RegisterRd = rs2)) then
+            -- Flush the ID stage and forward IDEX.PCp4 into the instruction memory
+            InsertNOP <= '1';
+            PCWrite <= '0';
+        else
             InsertNOP <= '0';
+            PCWrite <= '1';
         end if;
 
         -- Control generator
@@ -475,8 +494,11 @@ begin
         end case control;
 
         -- Forwarding unit
-        fA : if (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
-                                         and EXMEM.RegisterRd = IDEX.RegisterRs1) then
+        fA : if (IDEX2.WB.RegWrite = '1' and unsigned(IDEX2.RegisterRd) /= 0
+                                         and IDEX2.RegisterRd = IDEX.RegisterRs1) then
+            ForwardA <= OP_IDEX2;
+        elsif (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
+                                       and EXMEM.RegisterRd = IDEX.RegisterRs1) then
             ForwardA <= OP_EXMEM;
         elsif (MEMWB.WB.RegWrite = '1' and unsigned(MEMWB.RegisterRd) /= 0
                                        and MEMWB.RegisterRd = IDEX.RegisterRs1) then
@@ -485,8 +507,11 @@ begin
             ForwardA <= OP_IDEX;
         end if fA;
 
-        fB : if (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
-                                         and EXMEM.RegisterRd = IDEX.RegisterRs2) then
+        fB : if (IDEX2.WB.RegWrite = '1' and unsigned(IDEX2.RegisterRd) /= 0 
+                                         and IDEX2.RegisterRd = IDEX.RegisterRs2) then
+            ForwardB <= OP_IDEX2;
+        elsif (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
+                                       and EXMEM.RegisterRd = IDEX.RegisterRs2) then
             ForwardB <= OP_EXMEM;
         elsif (MEMWB.WB.RegWrite = '1' and unsigned(MEMWB.RegisterRd) /= 0
                                        and MEMWB.RegisterRd = IDEX.RegisterRs2) then
@@ -500,53 +525,59 @@ begin
         case (ForwardA) is
             when OP_IDEX =>
                 ALUOperand1m <= IDEX.Data1;
+            when OP_IDEX2 =>
+                ALUOperand1m <= ALUResult;
             when OP_EXMEM =>
                 ALUOperand1m <= EXMEM.Result;
             when others => -- OP_MEMWB
                 ALUOperand1m <= WriteData;
         end case;
+        IDEX2_next.ALUOperand1m <= ALUOperand1m;
         if (IDEX.EX.ALUSrcA = '0') then
-            ALUOperand1 <= ALUOperand1m;
+            IDEX2_next.ALUOperand1 <= ALUOperand1m;
         else
-            ALUOperand1 <= (others => '0');
-            ALUOperand1(PC_WIDTH-1 downto 0) <= IDEX.PC;
+            IDEX2_next.ALUOperand1 <= (others => '0');
+            IDEX2_next.ALUOperand1(PC_WIDTH-1 downto 0) <= IDEX.PC;
         end if;
         -- Choosing the second operand (two layers of multiplexors)
         case (ForwardB) is
             when OP_IDEX =>
                 ALUOperand2m <= IDEX.Data2;
+            when OP_IDEX2 =>
+                ALUOperand2m <= ALUResult;
             when OP_EXMEM =>
                 ALUOperand2m <= EXMEM.Result;
             when others => -- OP_MEMWB
                 ALUOperand2m <= WriteData;
         end case;
+        IDEX2_next.ALUOperand2m <= ALUOperand2m;
         if (IDEX.EX.ALUSrcB = '0') then
-            ALUOperand2 <= ALUOperand2m;
+            IDEX2_next.ALUOperand2 <= ALUOperand2m;
         else
-            ALUOperand2 <= IDEX.Immediate;
+            IDEX2_next.ALUOperand2 <= IDEX.Immediate;
         end if;
         -- Instantiating the actual ALU which operates on the above two operands
         -- and outputs a result determined by the control circuit in the ID stage
         temp := (others => '0');
-        alu : case (IDEX.EX.ALUOp) is
+        alu : case (IDEX2.EX2.ALUOp) is
             when ALU_ADD =>
-                ALUResult <= std_logic_vector(signed(ALUOperand1) + signed(ALUOperand2));
+                ALUResult <= std_logic_vector(signed(IDEX2.ALUOperand1) + signed(IDEX2.ALUOperand2));
             when ALU_SUB =>
-                ALUResult <= std_logic_vector(signed(ALUOperand1) - signed(ALUOperand2));
+                ALUResult <= std_logic_vector(signed(IDEX2.ALUOperand1) - signed(IDEX2.ALUOperand2));
             when ALU_AND =>
-                ALUResult <= ALUOperand1 and ALUOperand2;
+                ALUResult <= IDEX2.ALUOperand1 and IDEX2.ALUOperand2;
             when ALU_OR =>
-                ALUResult <= ALUOperand1 or ALUOperand2;
+                ALUResult <= IDEX2.ALUOperand1 or IDEX2.ALUOperand2;
             when ALU_XOR =>
-                ALUResult <= ALUOperand1 xor ALUOperand2;
+                ALUResult <= IDEX2.ALUOperand1 xor IDEX2.ALUOperand2;
             when ALU_SLT =>
-                if (signed(ALUOperand1) < signed(ALUOperand2)) then
+                if (signed(IDEX2.ALUOperand1) < signed(IDEX2.ALUOperand2)) then
                     ALUResult <= (0 => '1', others => '0');
                 else 
                     ALUResult <= (others => '0');
                 end if;
             when ALU_SLTU =>
-                if (unsigned(ALUOperand1) < unsigned(ALUOperand2)) then
+                if (unsigned(IDEX2.ALUOperand1) < unsigned(IDEX2.ALUOperand2)) then
                     ALUResult <= (0 => '1', others => '0');
                 else 
                     ALUResult <= (others => '0');
@@ -554,59 +585,59 @@ begin
             when ALU_SLL =>
                 -- For RV64I, the shamt value is 6 bits for register-register instructions and
                 -- for doubleword-size immediate instructions
-                ALUResult <= std_logic_vector(shift_left(unsigned(ALUOperand1), 
-                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_left(unsigned(IDEX2.ALUOperand1), 
+                                              to_integer(unsigned(IDEX2.ALUOperand2(5 downto 0)))));
             when ALU_SRL =>
-                ALUResult <= std_logic_vector(shift_right(unsigned(ALUOperand1), 
-                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_right(unsigned(IDEX2.ALUOperand1), 
+                                              to_integer(unsigned(IDEX2.ALUOperand2(5 downto 0)))));
             when ALU_SRA =>
-                ALUResult <= std_logic_vector(shift_right(signed(ALUOperand1), 
-                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_right(signed(IDEX2.ALUOperand1), 
+                                              to_integer(unsigned(IDEX2.ALUOperand2(5 downto 0)))));
             when ALU_ADDW =>
                 -- Adds together two 32-bit words and sign-extends the 32-bit result to 64 bits
-                temp(31 downto 0) := std_logic_vector(signed(ALUOperand1(31 downto 0)) 
-                                                    + signed(ALUOperand2(31 downto 0)));
+                temp(31 downto 0) := std_logic_vector(signed(IDEX2.ALUOperand1(31 downto 0)) 
+                                                    + signed(IDEX2.ALUOperand2(31 downto 0)));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SUBW =>
                 -- Same as above but with subtraction
-                temp(31 downto 0) := std_logic_vector(signed(ALUOperand1(31 downto 0)) 
-                                                    - signed(ALUOperand2(31 downto 0)));
+                temp(31 downto 0) := std_logic_vector(signed(IDEX2.ALUOperand1(31 downto 0)) 
+                                                    - signed(IDEX2.ALUOperand2(31 downto 0)));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SLLW =>
                 -- Shifts the low 32 bits of the first operand and sign-extends the result
-                temp(31 downto 0) := std_logic_vector(shift_left(unsigned(ALUOperand1(31 downto 0)),
-                                                      to_integer(unsigned(ALUOperand2(4 downto 0)))));
+                temp(31 downto 0) := std_logic_vector(shift_left(unsigned(IDEX2.ALUOperand1(31 downto 0)),
+                                                      to_integer(unsigned(IDEX2.ALUOperand2(4 downto 0)))));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SRLW =>
-                temp(31 downto 0) := std_logic_vector(shift_right(unsigned(ALUOperand1(31 downto 0)),
-                                                      to_integer(unsigned(ALUOperand2(4 downto 0)))));
+                temp(31 downto 0) := std_logic_vector(shift_right(unsigned(IDEX2.ALUOperand1(31 downto 0)),
+                                                      to_integer(unsigned(IDEX2.ALUOperand2(4 downto 0)))));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SRAW =>
-                temp(31 downto 0) := std_logic_vector(shift_right(signed(ALUOperand1(31 downto 0)),
-                                                      to_integer(unsigned(ALUOperand2(4 downto 0)))));
+                temp(31 downto 0) := std_logic_vector(shift_right(signed(IDEX2.ALUOperand1(31 downto 0)),
+                                                      to_integer(unsigned(IDEX2.ALUOperand2(4 downto 0)))));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when others => -- ALU_NOP
                 -- The second operand is passed through to allow LUI to work more easily
-                ALUResult <= ALUOperand2;
+                ALUResult <= IDEX2.ALUOperand2;
         end case alu;
         EXMEM_next.Result <= ALUResult;
         -- Code for the branch detection circuitry
-        if (unsigned(ALUOperand1m) = unsigned(ALUOperand2m)) then
+        if (unsigned(IDEX2.ALUOperand1m) = unsigned(IDEX2.ALUOperand2m)) then
             Zero <= '1';
         else
             Zero <= '0';
         end if;
-        if (unsigned(ALUOperand1m) < unsigned(ALUOperand2m)) then
+        if (unsigned(IDEX2.ALUOperand1m) < unsigned(IDEX2.ALUOperand2m)) then
             LessThanU <= '1';
         else
             LessThanU <= '0';
         end if;
-        if (signed(ALUOperand1m) < signed(ALUOperand2m)) then
+        if (signed(IDEX2.ALUOperand1m) < signed(IDEX2.ALUOperand2m)) then
             LessThan <= '1';
         else 
             LessThan <= '0';
@@ -615,18 +646,19 @@ begin
         -- Branch logic in the EX stage
         pc_inc <= std_logic_vector(unsigned(pc) + 4);
         IFID_next.PCp4 <= pc_inc;
-        br : case (IDEX.EX.Branch) is
+        ZeroControl <= '0';
+        br : case (IDEX2.EX2.Branch) is
             when BR_J =>
-                InsertNOP <= '1';
+                ZeroControl <= '1';
                 IFID_next.SkipInstr <= '1';
                 pc_next <= ALUResult(PC_WIDTH-1 downto 0);
             when BR_JR =>
-                InsertNOP <= '1';
+                ZeroControl <= '1';
                 IFID_next.SkipInstr <= '1';
                 pc_next <= ALUResult(PC_WIDTH-1 downto 1) & '0';
             when BR_EQ =>
                 if (Zero = '1') then
-                    InsertNOP <= '1';
+                    ZeroControl <= '1';
                     IFID_next.SkipInstr <= '1';
                     pc_next <= ALUResult(PC_WIDTH-1 downto 0);
                 else
@@ -634,7 +666,7 @@ begin
                 end if;
             when BR_NE =>
                 if (Zero = '0') then
-                    InsertNOP <= '1';
+                    ZeroControl <= '1';
                     IFID_next.SkipInstr <= '1';
                     pc_next <= ALUResult(PC_WIDTH-1 downto 0);
                 else
@@ -642,7 +674,7 @@ begin
                 end if;
             when BR_LT =>
                 if (LessThan = '1') then
-                    InsertNOP <= '1';
+                    ZeroControl <= '1';
                     IFID_next.SkipInstr <= '1';
                     pc_next <= ALUResult(PC_WIDTH-1 downto 0);
                 else
@@ -650,7 +682,7 @@ begin
                 end if;
             when BR_GE =>
                 if (LessThan = '0') then
-                    InsertNOP <= '1';
+                    ZeroControl <= '1';
                     IFID_next.SkipInstr <= '1';
                     pc_next <= ALUResult(PC_WIDTH-1 downto 0);
                 else
@@ -658,7 +690,7 @@ begin
                 end if;
             when BR_LTU =>
                 if (LessThanU = '1') then
-                    InsertNOP <= '1';
+                    ZeroControl <= '1';
                     IFID_next.SkipInstr <= '1';
                     pc_next <= ALUResult(PC_WIDTH-1 downto 0);
                 else
@@ -666,7 +698,7 @@ begin
                 end if;
             when BR_GEU =>
                 if (LessThanU = '0') then
-                    InsertNOP <= '1';
+                    ZeroControl <= '1';
                     IFID_next.SkipInstr <= '1';
                     pc_next <= ALUResult(PC_WIDTH-1 downto 0);
                 else
@@ -675,7 +707,11 @@ begin
             when others => -- NOP
                 if (pc /= PC_MAX and opcode /= "1110011") then
                     -- If an ECALL is in the ID-stage, stop the execution
-                    pc_next <= pc_inc;
+                    if (IDEX.M.MemRead = '1' and (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
+                        pc_next <= IDEX.PCp4;
+                    else
+                        pc_next <= pc_inc;
+                    end if;
                 else
                     pc_next <= pc;
                 end if;
@@ -686,7 +722,7 @@ begin
             when WB_RES =>
                 WriteData <= MEMWB.Result;
             when WB_MEM =>
-                WriteData <= MemData;
+                WriteData <= MEMWB.ReadData;
             when others => -- WB_PCp4
                 WriteData <= (others => '0');
                 WriteData(PC_WIDTH-1 downto 0) <= MEMWB.PCp4;
@@ -701,6 +737,7 @@ begin
                 pc <= (others => '0');
                 IFID <= IFID_reset;
                 IDEX <= IDEX_reset;
+                IDEX2 <= IDEX2_reset;
                 EXMEM <= EXMEM_reset;
                 MEMWB <= MEMWB_reset;
             else
@@ -710,14 +747,28 @@ begin
                     pc <= pc;
                 end if;
                 IFID <= IFID_next;
-                -- Zero control signals in case of branch taken
-                if (InsertNOP = '1') then
+                -- Zero control signals in case of branch taken or load-use hazard
+                if (ZeroControl = '1') then
+                    -- Flush the IDEX register
                     IDEX <= IDEX_next;
                     IDEX.EX <= EX_reset;
                     IDEX.M <= M_reset;
                     IDEX.WB <= WB_reset;
+                    -- Flush the IDEX2 register
+                    IDEX2 <= IDEX2_next;
+                    IDEX2.EX2 <= EX2_reset;
+                    IDEX2.M <= M_reset;
+                    IDEX2.WB <= WB_reset;
+                elsif (InsertNOP = '1') then
+                    -- Flush the IDEX register
+                    IDEX <= IDEX_next;
+                    IDEX.EX <= EX_reset;
+                    IDEX.M <= M_reset;
+                    IDEX.WB <= WB_reset;
+                    IDEX2 <= IDEX2_next;
                 else
                     IDEX <= IDEX_next;
+                    IDEX2 <= IDEX2_next;
                 end if;
                 EXMEM <= EXMEM_next;
                 MEMWB <= MEMWB_next;
