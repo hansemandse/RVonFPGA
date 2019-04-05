@@ -28,18 +28,21 @@ package includes is
     constant CLOCK_DIV : natural := 2;
     constant CLOCK_F_INT : natural := CLOCK_F / CLOCK_DIV;
 
+    -- Memory operations
+    type mem_op_t is (MEM_LB, MEM_LBU, MEM_LH, MEM_LHU, MEM_LW, MEM_LWU, MEM_LD, MEM_SB,
+                      MEM_SH, MEM_SW, MEM_SD, MEM_NOP);
+
     -- Communication relevant constants
     constant BAUD_RATE : natural := 115200; -- Used in course 02203 at DTU
 
     -- Pipeline relevant constants
     constant RF_ADDR_WIDTH : natural := 5;
     constant BYTE_WIDTH : natural := 8;
-    constant DATA_ADDR_WIDTH : natural := 12;
-    constant PC_WIDTH : natural := 12;
+    constant MEM_ADDR_WIDTH : natural := 16;
     constant DATA_WIDTH : natural := 64;
-    constant PC_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '0');
-    constant PCp4_reset : std_logic_vector(PC_WIDTH-1 downto 0) := (2 => '1', others => '0');
-    constant PC_MAX : std_logic_vector(PC_WIDTH-1 downto 0) := (others => '1');
+    constant PC_reset : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '0');
+    constant PCp4_reset : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (2 => '1', others => '0');
+    constant PC_MAX : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '1');
     -- Hardcoded NOP instruction (ADDI x0, x0, 0) used for branching
     constant NOP : std_logic_vector(31 downto 0) := x"00000013";
 
@@ -49,6 +52,9 @@ package includes is
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;
+
+    -- Function to get whether a memory operation is a read
+    impure function is_read_op (sig : mem_op_t) return boolean;
 end includes;
 
 package body includes is
@@ -75,4 +81,11 @@ package body includes is
         end loop;
         return index/4;
     end function;
+
+    -- Function body for the memory operation type analyzer
+    impure function is_read_op (sig : mem_op_t) return boolean is
+        begin
+            return (sig = MEM_LB or sig = MEM_LBU or sig = MEM_LH or sig = MEM_LHU or
+                    sig = MEM_LW or sig = MEM_LWU or sig = MEM_LD);
+        end function;
 end includes;

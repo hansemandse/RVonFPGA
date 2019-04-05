@@ -11,7 +11,7 @@
 --              : This entity represents a block-RAM of variable size used in the data memory
 --              : and the instruction memory of the pipeline
 --              |
--- Revision     : 1.0   (last updated March 24, 2019)
+-- Revision     : 1.1   (last updated April 5, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -29,17 +29,17 @@ use work.includes.all;
 entity bram_init is
     generic (
         DATA_WIDTH : natural := BYTE_WIDTH;
-        ADDR_WIDTH : natural := 9;
-        TEST_FILE : string;
-        NO_RAMS, RAM_NO : integer
+        ADDR_WIDTH : natural := 13;
+        TEST_FILE : string := TEST_FILE;
+        NO_RAMS, RAM_NO : integer := 1
     );
     port (
         -- Control ports
-        we, reset, clk : in std_logic;
+        wea, web, reset, clk : in std_logic;
         -- Data ports
-        raddr, waddr : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-        data_in : in std_logic_vector(DATA_WIDTH-1 downto 0);
-        data_out : out std_logic_vector(DATA_WIDTH-1 downto 0)
+        addra, addrb : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+        data_ina, data_inb : in std_logic_vector(DATA_WIDTH-1 downto 0);
+        data_outa, data_outb : out std_logic_vector(DATA_WIDTH-1 downto 0)
     );
 end bram_init;
 
@@ -88,17 +88,31 @@ architecture rtl of bram_init is
     -- The signal representing the block RAM initialized with instructions
     signal ram : ram_t := readFile;
 begin
-    mem : process (all)
+    mema : process (all)
     begin
         if (rising_edge(clk)) then
-            if (we = '1') then
-                ram(to_integer(unsigned(waddr))) <= data_in;
+            if (wea = '1') then
+                ram(to_integer(unsigned(addra))) <= data_ina;
             end if;
             if (reset = '1') then
-                data_out <= (others => '0');
+                data_outa <= (others => '0');
             else
-                data_out <= ram(to_integer(unsigned(raddr)));
+                data_outa <= ram(to_integer(unsigned(addra)));
             end if;
         end if;
-    end process mem;
+    end process mema;
+
+    memb : process (all)
+    begin
+        if (rising_edge(clk)) then
+            if (web = '1') then
+                ram(to_integer(unsigned(addrb))) <= data_inb;
+            end if;
+            if (reset = '1') then
+                data_outb <= (others => '0');
+            else
+                data_outb <= ram(to_integer(unsigned(addrb)));
+            end if;
+        end if;
+    end process memb;
 end rtl;
