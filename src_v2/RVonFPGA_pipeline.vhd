@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 2.0   (last updated April 4, 2019)
+-- Revision     : 2.0   (last updated April 8, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -108,7 +108,6 @@ architecture rtl of pipeline is
     type EXMEM_t is record
         -- Control signals
         WB : ControlWB_t;
-        M : ControlM_t;
         -- Data signals
         PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
         Result : std_logic_vector(DATA_WIDTH-1 downto 0);
@@ -131,7 +130,7 @@ architecture rtl of pipeline is
                                        MemData | Result | RegisterRd => (others => '0'));
 
     -- Declarations for the PC
-    signal pc, pc_next, pc_inc : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+    signal pc, pc_next : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
 
     -- Declarations for the IFID register
     signal IFID, IFID_next : IFID_t;
@@ -150,7 +149,7 @@ architecture rtl of pipeline is
     signal opcode, funct7 : std_logic_vector(6 downto 0);
     signal funct3 : std_logic_vector(2 downto 0);
     signal rs1, rs2, rd : std_logic_vector(4 downto 0);
-    signal PCWrite, InsertNOP : std_logic;
+    signal InsertNOP : std_logic;
 
     -- Signals for the EX stage
     signal Zero, LessThanU, LessThan : std_logic;
@@ -186,13 +185,16 @@ begin
     -- it is preferable to forward in IDEX.PCp4 (which is one instruction behind the
     -- current PC) such that only one clock cycle is wasted rather than updating the
     -- PC with a lower value such that two clock cycles are wasted.
-    IAddr <= pc when (PCWrite = '1') else IDEX.PCp4;
+    IAddr <= pc;
 
     -- Signals for the ID stage
     -- The instructions after a branch are avoided in two steps; the first subsequent
     -- instruction is avoided by zeroing all of its control signals; the second
     -- instruction is simply replaced by a hardcoded NOP (see Includes).
     Instruction <= IReadData(31 downto 0) when (IFID.SkipInstr = '0') else NOP;
+
+    -- TODO: Implement smart addressing such that the RAM is not activated/given
+    -- new addresses every clock cycle if accesses follow each other
 
     opcode <= Instruction(6 downto 0);
     rd <= Instruction(11 downto 7);
@@ -215,7 +217,7 @@ begin
 
     -- Connecting the memory ports
     IMemOp <= MEM_LW;
-    DMemOp <= EXMEM.M.MemOp;
+    DMemOp <= IDEX.M.MemOp;
     DAddr <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
     DWriteData <= ALUOperand2m;
 
@@ -223,6 +225,7 @@ begin
     comb: process (all)
         -- Temporary variable used in the ALU for word operations
         variable temp : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+        variable pc_inc, pc_dec : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '0');
     begin
         -- Default assignments for all register-related signals
         pc_next <= pc;
@@ -251,7 +254,6 @@ begin
         IDEX_next.RegisterRd <= rd;
 
         -- Updating values of the EXMEM register
-        EXMEM_next.M <= IDEX.M;
         EXMEM_next.WB <= IDEX.WB;
         EXMEM_next.PCp4 <= IDEX.PCp4;
         EXMEM_next.RegisterRd <= IDEX.RegisterRd;
@@ -307,21 +309,8 @@ begin
                 IDEX_next.Immediate <= (others => '0');
         end case imm;
 
-        -- Hazard detection
-        -- Note that PCWrite = '0' means that the read address to the instruction memory
-        -- will be IDEX.PCp4 rather than PC such that only a single clock cycle is wasted.
-        if (is_read_op(IDEX.M.MemOp) and (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
-            PCWrite <= '0';
-            InsertNOP <= '1';
-        else
-            PCWrite <= '1';
-            InsertNOP <= '0';
-        end if;
-
         -- Control generator
         control : case (opcode) is
-            when "0000000" => -- no instruction (not even NOP, just for safety)
-                -- All signals have default values assigned to them such that nothing happens
             when "0110111" => -- LUI
                 -- LUI places a sign-extended immediate in the destination register
                 IDEX_next.EX.ALUSrcB <= '1';
@@ -462,7 +451,7 @@ begin
                         end if;
                 end case;
                 IDEX_next.WB.RegWrite <= '1';
-            when others => -- register-register instructions
+            when "0110011" => -- register-register instructions
                 case (funct3) is
                     when "000" => -- ADD or SUB
                         if (funct7(5) = '1') then
@@ -490,6 +479,7 @@ begin
                         IDEX_next.EX.ALUOp <= ALU_AND;
                 end case;
                 IDEX_next.WB.RegWrite <= '1';
+            when others => -- Do nothing
         end case control;
 
         -- Forwarding unit
@@ -631,7 +621,9 @@ begin
         end if;
         
         -- Branch logic in the EX stage
-        pc_inc <= std_logic_vector(unsigned(pc) + 4);
+        InsertNOP <= '0';
+        pc_inc := std_logic_vector(unsigned(pc) + 4);
+        pc_dec := std_logic_vector(unsigned(pc) - 4);
         IFID_next.PCp4 <= pc_inc;
         br : case (IDEX.EX.Branch) is
             when BR_J =>
@@ -692,9 +684,21 @@ begin
                 end if;
             when others => -- NOP
                 if (pc /= PC_MAX and opcode /= "1110011") then
-                    -- If an ECALL is in the ID-stage, stop the execution
-                    pc_next <= pc_inc;
+                    if (is_read_op(IDEX.M.MemOp) and 
+                       (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
+                        -- Load-use hazard detected, go back one instruction
+                        InsertNOP <= '1';
+                        pc_next <= pc_dec;
+                    elsif (IReady = '0') then
+                        -- Instruction memory is not ready, wait for a clock cycle
+                        pc_next <= pc;
+                        IFID_next.SkipInstr <= '1';
+                    else
+                        pc_next <= pc_inc;
+                    end if;
                 else
+                    -- If an ECALL is in the ID-stage or the last memory address has
+                    -- been reached, stop the execution
                     pc_next <= pc;
                 end if;
         end case br;
@@ -722,15 +726,8 @@ begin
                 EXMEM <= EXMEM_reset;
                 MEMWB <= MEMWB_reset;
             else
-                if (PCWrite = '1' and IReady = '1') then
-                    pc <= pc_next;
-                else
-                    pc <= pc;
-                end if;
+                pc <= pc_next;
                 IFID <= IFID_next;
-                if (IReady = '0') then
-                    IFID.SkipInstr <= '1';
-                end if;
                 -- Zero control signals in case of branch taken
                 if (InsertNOP = '1') then
                     IDEX <= IDEX_next;

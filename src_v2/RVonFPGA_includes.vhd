@@ -38,7 +38,7 @@ package includes is
     -- Pipeline relevant constants
     constant RF_ADDR_WIDTH : natural := 5;
     constant BYTE_WIDTH : natural := 8;
-    constant MEM_ADDR_WIDTH : natural := 16;
+    constant MEM_ADDR_WIDTH : natural := 12;
     constant DATA_WIDTH : natural := 64;
     constant PC_reset : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '0');
     constant PCp4_reset : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (2 => '1', others => '0');
@@ -48,7 +48,7 @@ package includes is
 
     -- Test file for the instruction memory and for simulation of the pipeline
     constant INIT_RAM : std_logic := '1';
-    constant TEST_FILE : string := "../tests/s_tests/test_add.bin";
+    constant TEST_FILE : string := "../tests/s_tests/test_load.bin";
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;

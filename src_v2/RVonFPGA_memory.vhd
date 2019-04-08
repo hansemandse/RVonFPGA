@@ -14,7 +14,7 @@
 --              : memory also implements a "back door" UART which is not mapped into the
 --              : processor's address space.
 --              |
--- Revision     : 1.0   (last updated April 5, 2019)
+-- Revision     : 1.0   (last updated April 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -58,7 +58,7 @@ end memory;
 
 architecture rtl of memory is
     -- Number of RAM blocks to be implemented
-    constant NB_COL : integer := DATA_WIDTH / BLOCK_WIDTH;
+    constant NB_COL : natural := DATA_WIDTH / BLOCK_WIDTH;
     constant NB_LOG : natural := natural(log2(real(NB_COL)));
     -- Address width for the internal block RAMs
     constant ADDR_WIDTH_INT : natural := ADDR_WIDTH - NB_LOG;
@@ -107,8 +107,8 @@ begin
             variable MemOp : mem_op_t;
         begin
             -- Selecting which operation to perform first - data memory operations
-            -- first and instruction memory operations third
-            sel : if (DMemOP /= MEM_NOP) then
+            -- first and instruction memory operations second
+            sel : if (DMemOp /= MEM_NOP) then
                 Addr := DAddr;
                 Data := DWriteData;
                 MemOp := DMemOp;
@@ -121,7 +121,7 @@ begin
             
             -- Delivering data to the block RAMs
             DataInArraya(i) <= Data(((to_integer(to_unsigned(i-LowerBits, NB_LOG)))+1)*BLOCK_WIDTH-1 
-                             downto (to_integer(to_unsigned(i-LowerBits, NB_LOG)))*BLOCK_WIDTH);
+                              downto (to_integer(to_unsigned(i-LowerBits, NB_LOG)))*BLOCK_WIDTH);
 
             -- Delivering addresses to the block RAMs
             addra : if (LowerBits > i) then
@@ -177,11 +177,11 @@ begin
                                     downto (to_integer(to_unsigned(i-LowerBits, NB_LOG)))*BLOCK_WIDTH);
             
             -- Delivering addresses to the block RAMs
-            addr : if (LowerBits > i) then
+            addrb : if (LowerBits > i) then
                 AddrArrayb(i) <= std_logic_vector(unsigned(UAddr(ADDR_WIDTH-1 downto NB_LOG)) + 1);
             else
                 AddrArrayb(i) <= UAddr(ADDR_WIDTH-1 downto NB_LOG);
-            end if addr;
+            end if addrb;
 
             -- Delivering write enables to the block RAMs
             we : case (UMemOp) is
@@ -227,22 +227,20 @@ begin
     -- and operation type of the pipelined signals
     gen_out : process (all)
         variable LowerBits : natural;
-        variable MemOp : mem_op_t;
+        variable MemOp_p : mem_op_t;
         variable ReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
     begin
+        -- Selecting which address to get the lower bits from and which operation to run
         sel : if (DMemOp_p /= MEM_NOP) then
             LowerBits := to_integer(unsigned(DAddr_p));
-            MemOp := DMemOp_p;
-            IReadData <= (others => '0');
-            DReadData <= ReadData;
+            MemOp_p := DMemOp_p;
         else
             LowerBits := to_integer(unsigned(IAddr_p));
-            MemOp := IMemOp_p;
-            IReadData <= ReadData;
-            DReadData <= (others => '0');
-        end if;
+            MemOp_p := IMemOp_p;
+        end if sel;
+
         -- Outputs to the pipeline are sign-extended
-        pip : case (MemOp) is
+        pip : case (MemOp_p) is
             when MEM_LB =>
                 ReadData := (others => DataOutArraya(LowerBits)(7));
                 ReadData(BLOCK_WIDTH-1 downto 0) := DataOutArraya(LowerBits);
@@ -282,6 +280,14 @@ begin
                 ReadData := (others => '0');
         end case pip;
 
+        -- Selecting where to output the data to
+        sel2 : if (DMemOp_p /= MEM_NOP) then
+            IReadData <= (others => '0');
+            DReadData <= ReadData;
+        else
+            IReadData <= ReadData;
+            DReadData <= (others => '0');
+        end if;
 
         -- Outputs to the UART are not sign-extended
         LowerBits := to_integer(unsigned(UAddr_p));

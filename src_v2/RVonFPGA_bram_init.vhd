@@ -11,7 +11,7 @@
 --              : This entity represents a block-RAM of variable size used in the data memory
 --              : and the instruction memory of the pipeline
 --              |
--- Revision     : 1.1   (last updated April 5, 2019)
+-- Revision     : 1.2   (last updated April 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -86,13 +86,13 @@ architecture rtl of bram_init is
     end function;
 
     -- The signal representing the block RAM initialized with instructions
-    signal ram : ram_t := readFile;
+    shared variable ram : ram_t := readFile;
 begin
     mema : process (all)
     begin
         if (rising_edge(clk)) then
             if (wea = '1') then
-                ram(to_integer(unsigned(addra))) <= data_ina;
+                ram(to_integer(unsigned(addra))) := data_ina;
             end if;
             if (reset = '1') then
                 data_outa <= (others => '0');
@@ -106,7 +106,7 @@ begin
     begin
         if (rising_edge(clk)) then
             if (web = '1') then
-                ram(to_integer(unsigned(addrb))) <= data_inb;
+                ram(to_integer(unsigned(addrb))) := data_inb;
             end if;
             if (reset = '1') then
                 data_outb <= (others => '0');

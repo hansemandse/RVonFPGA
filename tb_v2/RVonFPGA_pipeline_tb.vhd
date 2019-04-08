@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This is a testbench for the pipeline.
 --              |
--- Revision     : 1.2   (last updated April 5, 2019)
+-- Revision     : 1.2   (last updated April 7, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -48,6 +48,7 @@ architecture rtl of pipeline_tb is
             -- Input ports
             clk, reset : in std_logic;
             -- Instruction memory interface
+            IMemOp : out mem_op_t;
             IReady : in std_logic;
             IAddr : out std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
             IReadData : in std_logic_vector(DATA_WIDTH-1 downto 0);
