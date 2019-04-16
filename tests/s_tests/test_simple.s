@@ -1,6 +1,6 @@
-# Load test operand
-li a0, 0x0102030405060708
+start:
 nop
 nop
 nop
+beq x0, x0, start
 ecall

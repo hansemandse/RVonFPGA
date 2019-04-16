@@ -48,6 +48,7 @@ architecture rtl of bram_init is
     type ram_t is array(ARRAY_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
 
     -- Size of the entire memory used for index checking in the read function
+    constant NB_COL : natural := natural(log2(real(NO_RAMS)));
     constant MEM_SIZE : natural := ARRAY_WIDTH * NO_RAMS;
 
     -- Function for reading a binary file and initializing each ram position accordingly
@@ -70,17 +71,17 @@ architecture rtl of bram_init is
             while (c_line'length > 0 and index < MEM_SIZE) loop
                 read(c_line, c_buf);
                 -- Store the character only if it goes in the ith memory block
-                if (to_unsigned(index, integer(log2(real(NO_RAMS)))) = RAM_NO) then
+                if (to_unsigned(index, NB_COL) = RAM_NO) then
                     res(index/NO_RAMS) := std_logic_vector(to_unsigned(character'pos(c_buf), DATA_WIDTH));
                 end if;
                 index := index + 1;
             end loop;
             -- File contained more than one line meaning that c_line missed a LF (0x0a in ASCII)
-            if (not endfile(file_in) and to_unsigned(index, integer(log2(real(NO_RAMS)))) = RAM_NO 
+            if (not endfile(file_in) and to_unsigned(index, NB_COL) = RAM_NO 
                                      and index < MEM_SIZE) then
                 res(index/NO_RAMS) := x"0a";
-                index := index + 1;
             end if;
+            index := index + 1;
         end loop;
         return res;
     end function;

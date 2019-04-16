@@ -39,11 +39,10 @@ clearChar = b'c'
 
 ################################################################################
 # Variables
-download_program = b'0'
-upload_regcontent = b'0'
+download_program = b''
+upload_memcontent = b''
 
-memory_size = 4096
-rf_size = 256
+memory_size = 2 ** 16
 
 download_progress = 0
 upload_progress = 0
@@ -161,47 +160,44 @@ def resetDownload(button):
     return
 
 def resetUpload(button):
-    global upload_regcontent
+    global upload_memcontent
     global upload_progress
-    upload_regcontent = b'0'
+    upload_memcontent = b'0'
     upload_progress = 0
     app.setEntry(
         "entry_u1", 
-        "Select where to save the uploaded RF content.", 
+        "Select where to save the uploaded memory content.", 
         callFunction=False
     )
     return
 
-# This function seems functional
 def openDownloadFile(button):
     # Retrieve name of download file from the entry in the app
     download_file = app.openBox(title="Open binary file", dirName=None, fileTypes=[
                                 ('binary', '*.bin')], asFile=False)
-    
+
     # If the download file name is not empty, read the file and check for correctness
     if download_file != "":
         try:
-            # Initialize an empty list
-            file_content = []
             # Open the file in read mode
             with open(download_file, 'rb') as f:
                 # Read all bytes from the file
-                for line in f:
-                    for c in line:
-                        file_content.append(c)
+                file_content = bytearray(f.read())
             # with open automatically closes the file when finished
+            file_content_list = []
+            for b in file_content:
+                file_content_list.append(b)
         except Exception:
             app.errorBox("Error!", "The selected file cannot be opened.")
             return
 
         # Check that the test program is not too large for the instruction memory
-        if len(file_content) > memory_size:
-            app.errorBox("Error!", "The selected test program is too large for the instruction memory.")
+        if len(file_content_list) > memory_size:
+            app.errorBox("Error!", "The selected test program is too large for the memory.")
             return
-        
-        # The test program can be loaded
+
         global download_program
-        download_program = bytes(file_content)
+        download_program = bytes(file_content_list)
 
         # The test program has not been downloaded
         global program_downloaded
@@ -217,103 +213,22 @@ def openDownloadFile(button):
     else:
         return
 
-# Added to convert a bytes array to a list of strings for writing the register file
-# content into an output file
-def bytesToDoubleWordStringList(arr):
-    rf_string_list = []
-    fs = '{:02x}'
-    for i in range(0, len(arr), 8):
-        temp = ('0x{:02x}'.format(arr[i+7]) + fs.format(arr[i+6])
-             + fs.format(arr[i+5]) + fs.format(arr[i+4])
-             + fs.format(arr[i+3]) + fs.format(arr[i+2])
-             + fs.format(arr[i+1]) + fs.format(arr[i]))
-        rf_string_list.append(temp)
-    return rf_string_list
-
-# This function seems functional (not tested with uploaded register file content)
 def saveUploadFile(button):
-    global upload_regcontent
-    # Check uploaded data correctness
-    if (len(upload_regcontent) != rf_size):
-        app.errorBox("Error!", "The uploaded RF content is not the correct size.")
-        return
-    
-    # Determine destination file path
-    upload_file = app.saveBox(title="Save RF content", dirName=None, fileName="RegContent.txt",
-                              fileExt=".txt", fileTypes=[('text', '*.txt')], asFile=False)
+    global upload_memcontent
+    upload_file = app.saveBox(title="Save binary file", dirName=None, fileName="upload.bin",
+                              fileExt=".bin", fileTypes=[('binary', '*.bin')], asFile=False)
     if upload_file != "":
         try:
-            # Convert the uploaded register file content to a list of doublewords as strings
-            rf_string_list = bytesToDoubleWordStringList(upload_regcontent)
-            with open(upload_file, "w") as f:
-                # Write a simple comment to indicate the file content
-                f.write("# Uploaded RF content\n")
-                for s in rf_string_list:
-                    # Write all double words in the uploaded register file content
-                    f.write(s + '\n')
-        except Exception:
+            memcontent_tmp = bytearray(upload_memcontent)
+            with open(upload_file, "w+b") as f:
+                f.write(memcontent_tmp)
+        except Exception as e:
             app.errorBox("Error!", "The selected file cannot be opened.")
             return
-        
-        # Insert the file name in the entry box in the app
-        app.setEntry(
-            "entry_u1", 
-            upload_file, 
-            callFunction=False
-        )
+        app.setEntry("entry_u1", upload_file, callFunction=False)
         return
     else:
         return
-
-# Added to convert a bytes array to a list of strings for presenting the instructions
-# of a test program visualized with the openDownloadFile function
-def bytesToWordStringList(arr):
-    program_string_list = []
-    fs = '{:02x}'
-    for i in range(0, len(arr), 4):
-        temp = ('0x{:02x}'.format(arr[i+3]) + fs.format(arr[i+2]) 
-             + fs.format(arr[i+1]) + fs.format(arr[i]))
-        program_string_list.append(temp)
-    return program_string_list
-
-# The following function displays a test program in a small window - it may need
-# scrolling capabilities, but I do not know how to add those cleverly
-def showDownloadFile(button):
-    global fig_d_app
-    global download_program
-    if fig_d_app is not None:
-        fig_d_app.destroy()
-        fig_d_app = None
-    fig_d_app = tk.Toplevel()
-    fig_d_app.title("Show test program")
-    fig_d_app.resizable(False, False)
-    program_string_list = bytesToWordStringList(download_program)
-    tk.Label(fig_d_app, text="Address\tMemory content", font="Verdana 10 bold").pack()
-    for i in range(0, len(program_string_list), 2):
-        temp = str(i*4) + '\t' + program_string_list[i]
-        if not(i+1 >= len(program_string_list)):
-            temp = temp + '\t' + program_string_list[i+1]
-        tk.Label(fig_d_app, text=temp, justify=tk.LEFT).pack()
-    fig_d_app.mainloop()
-    return
-
-# The following function displays register file content in a small window - it may
-# need scrolling capabilities, but I do not know how to add those cleverly
-def showUploadRegContent(button):
-    global fig_u_app
-    global upload_regcontent
-    if fig_u_app is not None:
-        fig_u_app.destroy()
-        fig_u_app = None
-    fig_u_app = tk.Toplevel()
-    fig_u_app.title("Show register file content")
-    fig_u_app.resizable(False, False)
-    rf_string_list = bytesToDoubleWordStringList(upload_regcontent)
-    tk.Label(fig_u_app, text="Address\tRegister content", font="Verdana 10 bold").pack()
-    for s in rf_string_list:
-        tk.Label(fig_u_app, text=s, justify=tk.LEFT).pack()
-    fig_u_app.mainloop()
-    return
 
 def showHelp():
     global help_app
@@ -394,17 +309,20 @@ def downloadSerialTh():
                 ser.reset_output_buffer()
                 # Bring controller into its download state
                 ser.write(downloadChar)
-                # Upload the entire test program one byte at a time
-                for i in range(0, memory_size-1):
+                # Upload the entire test program - one instruction at a time
+                # followed by a lot of zero-bytes
+                i = 0
+                while i < memory_size:
                     if i < len(download_program):
-                        # This byte exists in the test program
-                        ser.write(download_program(i))
+                        ser.write(download_program[i:i+4])
+                        i += 4
                     else:
-                        # Fill the remaining memory positions with zeroes
                         ser.write(b'\x00')
-                    download_progress = int(100 * (i / memory_size))
+                        i += 1
+                    download_progress = int(100 *(i / memory_size))
                 # Close the serial connection after finishing the download
                 ser.close()
+                download_progress = 100
                 program_downloaded = True
             else:
                 app.errorBox(
@@ -458,7 +376,7 @@ def clearMemoryTh():
 
 def uploadSerialTh():
     global upload_progress
-    global upload_regcontent
+    global upload_memcontent
     upload_progress = 0
     global serial_free
     # Mark the serial connection as being in use
@@ -484,34 +402,33 @@ def uploadSerialTh():
                 # Bring the controller into its upload state
                 ser.write(uploadChar)
                 # Attempt to read the first eight bytes
-                upload_regcontent_size = 0
+                upload_memcontent_size = 0
                 read_data = ser.read(8)
-                upload_regcontent_tmp = bytearray(b'')
+                upload_memcontent_tmp = bytearray(b'')
                 if len(read_data) == 0:
                     # Serial connection timed out (no data received within time)
                     app.errorBox(
                         "Error!", "No data was received on the selected serial port.")
                 else:
                     # While there is still more data to receive, read in data and store it
-                    while (len(read_data) != 0 and upload_regcontent_size < rf_size):
-                        upload_regcontent_tmp.extend(read_data)
-                        upload_regcontent_size = upload_regcontent_size + len(read_data)
-                        upload_progress = int(
-                            99 * (upload_regcontent_size / rf_size))
+                    while (len(read_data) != 0 and upload_memcontent_size < memory_size):
+                        upload_memcontent_tmp.extend(read_data)
+                        upload_memcontent_size = upload_memcontent_size + len(read_data)
+                        upload_progress = int(100 * (upload_memcontent_size / memory_size))
                         read_data = ser.read(8)
                     # Update the indicator that the register file content is uploaded
                     upload_progress = 100
                     # Run checks on the received data to check its dimensions against the expected
-                    if len(upload_regcontent_tmp) < rf_size:
+                    if upload_memcontent_size < memory_size:
                         app.errorBox(
-                            "Error!", "No enough data was received on the selected serial port.")
-                        upload_regcontent = bytes(b'0')
-                    elif len(upload_regcontent_tmp) > rf_size:
+                            "Error!", "Not enough data was received on the selected serial port.")
+                        upload_memcontent = bytes(b'0')
+                    elif upload_memcontent_size > memory_size:
                         app.errorBox(
                             "Error!", "Too much data was received on the selected serial port.")
-                        upload_regcontent = bytes(b'0')
+                        upload_memcontent = bytes(b'0')
                     else:
-                        upload_regcontent = bytes(upload_regcontent_tmp)
+                        upload_memcontent = bytes(upload_memcontent_tmp)
                 # Close the serial connection after finishing the upload
                 ser.close()
             else:
@@ -522,37 +439,6 @@ def uploadSerialTh():
             "Error!", "Impossible to communicate on the selected serial port.")
     # Mark the serial connection as being free again
     serial_free = True
-    return
-
-def startExecutionTh():
-    try:
-        if not serial_available:
-            app.errorBox("Error!", "No serial ports available.")
-        else:
-            # Check that the serial connection is indeed available
-            testSerial_cnt = 10
-            while(not(testSerial())):
-                testSerial_cnt = testSerial_cnt - 1
-                if testSerial_cnt == 0:
-                    break
-                time.sleep(0.1)
-            if testSerial():
-                # Create and open a serial connection
-                ser = serial.Serial(port=app.getOptionBox("list_serial_s"), baudrate=115200,
-                                    bytesize=8, parity='N', stopbits=1, timeout=1, xonxoff=0, rtscts=0)
-                ser.reset_input_buffer()
-                ser.reset_output_buffer()
-                # Bring the controller into its clear state
-                ser.write(runChar)
-                time.sleep(1)
-                # Close the serial connection after finishing the communication
-                ser.close()
-            else:
-                app.errorBox(
-                    "Error!", "Impossible to communicate on the selected serial port.")
-    except:
-        app.errorBox(
-            "Error!", "Impossible to communicate on the selected serial port.")
     return
 
 def updateMeters():
@@ -661,10 +547,10 @@ def updateEnableDisable():
         download_program_exists = False
     else:
         download_program_exists = True
-    if len(upload_regcontent) != rf_size:
-        upload_regcontent_exists = False
+    if len(upload_memcontent) != memory_size:
+        upload_memcontent_exists = False
     else:
-        upload_regcontent_exists = True
+        upload_memcontent_exists = True
 
     # Start
     # Serial list
@@ -692,16 +578,6 @@ def updateEnableDisable():
         app.enableButton("button_d3")
     else:
         app.disableButton("button_d3")
-    # Button: Download Show
-    if serial_free and download_program_exists:
-        app.enableButton("button_d2")
-    else:
-        app.disableButton("button_d2")
-    # Button: Start execution
-    if serial_free and program_downloaded:
-        app.enableButton("button_d5")
-    else:
-        app.disableButton("button_d5")
     # Button: Download Reset
     if serial_free:
         app.enableButton("button_d4")
@@ -712,18 +588,13 @@ def updateEnableDisable():
         app.enableButton("button_u3")
     else:
         app.disableButton("button_u3")
-    # Button: Upload show
-    if serial_free and upload_regcontent_exists:
-        app.enableButton("button_u2")
-    else:
-        app.disableButton("button_u2")
     # Button: Upload Reset
     if serial_free:
         app.enableButton("button_u4")
     else:
         app.disableButton("button_u4")
     # Button: Upload save
-    if serial_free and upload_regcontent_exists:
+    if serial_free and upload_memcontent_exists:
         app.enableButton("button_u1")
     else:
         app.disableButton("button_u1")
@@ -792,31 +663,24 @@ row = row + 1
 app.addLabel("label_d2", "Actions:", row, 0)
 app.setLabelAlign("label_d2", "right")
 app.addNamedButton("Download test program", "button_d3", downloadSerial, row, 1)
-app.addNamedButton("Show test program", "button_d2", showDownloadFile, row, 2)
 app.addNamedButton("Reset", "button_d4", resetDownload, row, 3)
 # Row 2
 row = row + 1
 app.addLabel("label_d3", "Download status:", row, 0)
 app.setLabelAlign("label_d3", "right")
 app.addMeter("meter_d1", row, 1, 3)
-# Row 3
-row = row + 3
-app.addLabel("label_d5", "Start execution:", row, 0)
-app.setLabelAlign("label_d5", "right")
-app.addNamedButton("Execute", "button_d5", startExecution, row, 1)
 
 # Upload section
 row = row + 1
 app.addHorizontalSeparator(row, 0, 4)
 row = row + 1
-app.addLabel("label_u_title", "Upload register file content from the FPGA board", row, 0, 4)
+app.addLabel("label_u_title", "Upload memory content from the FPGA board", row, 0, 4)
 app.setLabelAlign("label_u_title", "left")
 # Row 0
 row = row + 1
 app.addLabel("label_u2", "Actions:", row, 0)
 app.setLabelAlign("label_u2", "right")
-app.addNamedButton("Upload register file content", "button_u3", uploadSerial, row, 1)
-app.addNamedButton("Show register file content", "button_u2", showUploadRegContent, row, 2)
+app.addNamedButton("Upload memory content", "button_u3", uploadSerial, row, 1)
 app.addNamedButton("Reset", "button_u4", resetUpload, row, 3)
 
 # Row 2
@@ -827,11 +691,11 @@ app.addMeter("meter_u1", row, 1, 3)
 
 # Row 0
 row = row + 1
-app.addLabel("label_u1", "Save register content to file:", row, 0)
+app.addLabel("label_u1", "Save memory content to file:", row, 0)
 app.setLabelAlign("label_u1", "right")
 app.addEntry("entry_u1", row, 1, 2)
 app.setEntry(
-    "entry_u1", "Select where to save the uploaded register file content.", callFunction=False)
+    "entry_u1", "Select where to save the uploaded memory content.", callFunction=False)
 app.disableEntry("entry_u1")
 app.addNamedButton("Save...", "button_u1", saveUploadFile, row, 3)
 
