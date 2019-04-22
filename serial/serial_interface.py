@@ -12,7 +12,7 @@
 #              : a UART connection. The original program was developed by Luca Pezzarossa
 #              : for the course 02203 at DTU, see https://github.com/lucapezza/02203-serial-interface 
 #              |
-# Revision     : 1.0   (last updated March 28, 2019)
+# Revision     : 1.1   (last updated April 16, 2019)
 #              |
 # Available at : https://github.com/hansemandse/RVonFPGA
 #              |

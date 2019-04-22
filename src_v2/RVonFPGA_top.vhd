@@ -205,7 +205,7 @@ begin
         tx => serial_tx
     );
 
-    control : controller
+    control : entity work.controller(rtl2)
     port map (
         clk => clk_int,
         reset => reset,
