@@ -11,7 +11,7 @@
 --              : This entity represents the top entity interconnecting the pipeline, the
 --              : clock divider and the UART controller.
 --              |
--- Revision     : 1.1   (last updated April 5, 2019)
+-- Revision     : 1.1   (last updated April 24, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -205,7 +205,7 @@ begin
         tx => serial_tx
     );
 
-    control : entity work.controller(rtl2)
+    control : controller
     port map (
         clk => clk_int,
         reset => reset,
