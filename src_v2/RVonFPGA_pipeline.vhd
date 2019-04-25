@@ -22,6 +22,7 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
+use IEEE.math_real.all;
 
 library work;
 use work.includes.all;
@@ -78,10 +79,12 @@ architecture rtl of pipeline is
     -- Declarations for the IFID register
     type IFID_t is record
         SkipInstr : std_logic;
+        IMemOp : mem_op_t;
         PC : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
         PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
     end record IFID_t;
-    constant IFID_reset : IFID_t := (SkipInstr => '0', PC => PC_reset, PCp4 => PCp4_reset);
+    constant IFID_reset : IFID_t := (SkipInstr => '0', IMemOp => MEM_NOP, 
+                                     PC => PC_reset, PCp4 => PCp4_reset);
 
     -- Declarations for the IDEX register
     type IDEX_t is record
@@ -89,6 +92,7 @@ architecture rtl of pipeline is
         WB : ControlWB_t;
         M : ControlM_t;
         EX : ControlEX_t;
+        IMemOp : mem_op_t;
         -- Data signals
         PC : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
         PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
@@ -100,7 +104,7 @@ architecture rtl of pipeline is
         RegisterRd : std_logic_vector(4 downto 0);
     end record IDEX_t;
     constant IDEX_reset : IDEX_t := (WB => WB_reset, M => M_reset, EX => EX_reset,
-                                     PC => PC_reset, PCp4 => PCp4_reset,
+                                     IMemOp => MEM_NOP, PC => PC_reset, PCp4 => PCp4_reset,
                                      Immediate | Data1 | Data2 | RegisterRs1 | RegisterRs2 | 
                                      RegisterRd => (others => '0'));
 
@@ -113,7 +117,7 @@ architecture rtl of pipeline is
         Result : std_logic_vector(DATA_WIDTH-1 downto 0);
         RegisterRd : std_logic_vector(4 downto 0);
     end record EXMEM_t;
-    constant EXMEM_reset : EXMEM_t := (WB => WB_reset, M => M_reset, PCp4 => PCp4_reset,
+    constant EXMEM_reset : EXMEM_t := (WB => WB_reset, PCp4 => PCp4_reset,
                                        Result | RegisterRd => (others => '0'));
 
     -- Declarations for the MEMWB register
@@ -146,6 +150,9 @@ architecture rtl of pipeline is
 
     -- Signals for the ID stage
     signal Instruction : std_logic_vector(31 downto 0);
+    --attribute DONT_TOUCH : string;
+    --attribute DONT_TOUCH of Instruction : signal is "true";
+    signal IBuf, IBuf_next : std_logic_vector(31 downto 0);
     signal opcode, funct7 : std_logic_vector(6 downto 0);
     signal funct3 : std_logic_vector(2 downto 0);
     signal rs1, rs2, rd : std_logic_vector(4 downto 0);
@@ -188,14 +195,6 @@ begin
     IAddr <= pc;
 
     -- Signals for the ID stage
-    -- The instructions after a branch are avoided in two steps; the first subsequent
-    -- instruction is avoided by zeroing all of its control signals; the second
-    -- instruction is simply replaced by a hardcoded NOP (see Includes).
-    Instruction <= IReadData(31 downto 0) when (IFID.SkipInstr = '0') else NOP;
-
-    -- TODO: Implement smart addressing such that the RAM is not activated/given
-    -- new addresses every clock cycle if accesses follow each other
-
     opcode <= Instruction(6 downto 0);
     rd <= Instruction(11 downto 7);
     funct3 <= Instruction(14 downto 12);
@@ -216,7 +215,6 @@ begin
     );
 
     -- Connecting the memory ports
-    IMemOp <= MEM_LW;
     DMemOp <= IDEX.M.MemOp;
     DAddr <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
     DWriteData <= ALUOperand2m;
@@ -240,6 +238,7 @@ begin
         IFID_next.PC <= pc;
 
         -- Updating values of the IDEX register
+        IDEX_next.IMemOp <= IFID.IMemOp;
         IDEX_next.EX.ALUSrcA <= '0';
         IDEX_next.EX.ALUSrcB <= '0';
         IDEX_next.EX.ALUOp <= ALU_NOP;
@@ -264,6 +263,33 @@ begin
         MEMWB_next.MemData <= DReadData;
         MEMWB_next.Result <= EXMEM.Result;
         MEMWB_next.RegisterRd <= EXMEM.RegisterRd;
+
+        -- Instruction fetch-related updates
+        IBuf_next <= IReadData(DATA_WIDTH-1 downto DATA_WIDTH/2);
+        if (IFID.IMemOp = MEM_LD and IFID.PCp4 = pc) then
+            -- Memory just performed a LD operation meaning that two instructions are
+            -- available in the pipeline (one to be run straight away, the other to be
+            -- buffered in a register)
+            IFID_next.IMemOp <= MEM_NOP;
+            IMemOp <= MEM_NOP;
+        elsif (IFID.PCp4 /= pc and pc(2) = '1') then
+            -- Branch has been taken and the instruction fetch address is not 0-aligned
+            IFID_next.IMemOp <= MEM_LW;
+            IMemOp <= MEM_LW;
+        else
+            IFID_next.IMemOp <= MEM_LD;
+            IMemOp <= MEM_LD;
+        end if;
+        if (IDEX.IMemOp = MEM_LD and IDEX.PCp4 = IFID.PC and IFID.SkipInstr = '0') then
+            -- One cycle ago, a LD was performed; run buffered instruction if pipeline
+            -- has not performed branch
+            Instruction <= IBuf;
+        elsif (IFID.SkipInstr = '1') then
+            Instruction <= NOP;
+        else
+            Instruction <= IReadData(DATA_WIDTH/2-1 downto 0);
+        end if;
+
 
         -- Immediate generator
         imm : case (opcode) is
@@ -720,14 +746,20 @@ begin
     begin
         if (rising_edge(clk)) then
             if (reset = '1') then
+                IBuf <= NOP;
                 pc <= (others => '0');
                 IFID <= IFID_reset;
                 IDEX <= IDEX_reset;
                 EXMEM <= EXMEM_reset;
                 MEMWB <= MEMWB_reset;
             else
+                IBuf <= IBuf_next;
                 pc <= pc_next;
                 IFID <= IFID_next;
+                -- Update instruction buffer
+                if (IFID.IMemOp = MEM_LD) then
+                    IBuf <= IBuf_next;
+                end if;
                 -- Zero control signals in case of branch taken
                 if (InsertNOP = '1') then
                     IDEX <= IDEX_next;
