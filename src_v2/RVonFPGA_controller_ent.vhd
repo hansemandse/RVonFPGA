@@ -12,7 +12,7 @@
 --              : by an implementation of a similar component by Luca Pezzarossa in course
 --              : 02203 at DTU, see https://github.com/lucapezza/02203-serial-interface
 --              |
--- Revision     : 2.1   (last updated April 24, 2019)
+-- Revision     : 2.1   (last updated April 25, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |

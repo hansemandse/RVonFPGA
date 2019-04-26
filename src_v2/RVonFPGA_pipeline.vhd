@@ -13,7 +13,7 @@
 --              : circuitry (next-state, arithmetics and outputs) and one describing the
 --              : registers.
 --              |
--- Revision     : 2.0   (last updated April 8, 2019)
+-- Revision     : 2.0   (last updated April 26, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -145,8 +145,13 @@ architecture rtl of pipeline is
     -- Declarations for the EXMEM register
     signal EXMEM, EXMEM_next : EXMEM_t;
 
+    attribute max_fanout : integer;
+    attribute max_fanout of EXMEM : signal is 50;
+
     -- Declarations for the MEMWB register
     signal MEMWB, MEMWB_next : MEMWB_t;
+
+    attribute max_fanout of MEMWB : signal is 50;
 
     -- Signals for the ID stage
     signal Instruction : std_logic_vector(31 downto 0);
@@ -160,7 +165,6 @@ architecture rtl of pipeline is
 
     -- Signals for the EX stage
     signal Zero, LessThanU, LessThan : std_logic;
-    signal ForwardA, ForwardB : op_t;
     signal ALUOperand1, ALUOperand2, ALUResult, ALUOperand1m, ALUOperand2m
                                             : std_logic_vector(DATA_WIDTH-1 downto 0);
 
@@ -188,10 +192,6 @@ architecture rtl of pipeline is
     end component;
 begin
     -- Signals for the IF stage
-    -- The read address is usually just the PC, but when a load-use hazard occurs,
-    -- it is preferable to forward in IDEX.PCp4 (which is one instruction behind the
-    -- current PC) such that only one clock cycle is wasted rather than updating the
-    -- PC with a lower value such that two clock cycles are wasted.
     IAddr <= pc;
 
     -- Signals for the ID stage
@@ -511,49 +511,32 @@ begin
         -- Forwarding unit
         fA : if (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
                                          and EXMEM.RegisterRd = IDEX.RegisterRs1) then
-            ForwardA <= OP_EXMEM;
+            ALUOperand1m <= EXMEM.Result;
         elsif (MEMWB.WB.RegWrite = '1' and unsigned(MEMWB.RegisterRd) /= 0
                                        and MEMWB.RegisterRd = IDEX.RegisterRs1) then
-            ForwardA <= OP_MEMWB;
+            ALUOperand1m <= WriteData;
         else
-            ForwardA <= OP_IDEX;
+            ALUOperand1m <= IDEX.Data1;
         end if fA;
-
         fB : if (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
                                          and EXMEM.RegisterRd = IDEX.RegisterRs2) then
-            ForwardB <= OP_EXMEM;
+            ALUOperand2m <= EXMEM.Result;
         elsif (MEMWB.WB.RegWrite = '1' and unsigned(MEMWB.RegisterRd) /= 0
                                        and MEMWB.RegisterRd = IDEX.RegisterRs2) then
-            ForwardB <= OP_MEMWB;
+            ALUOperand2m <= WriteData;
         else
-            ForwardB <= OP_IDEX;
+            ALUOperand2m <= IDEX.Data2;
         end if fB;
 
         -- Arithmetic circuit (ALU and its multiplexors)
         -- Choosing the first operand
-        case (ForwardA) is
-            when OP_IDEX =>
-                ALUOperand1m <= IDEX.Data1;
-            when OP_EXMEM =>
-                ALUOperand1m <= EXMEM.Result;
-            when others => -- OP_MEMWB
-                ALUOperand1m <= WriteData;
-        end case;
         if (IDEX.EX.ALUSrcA = '0') then
             ALUOperand1 <= ALUOperand1m;
         else
             ALUOperand1 <= (others => '0');
             ALUOperand1(MEM_ADDR_WIDTH-1 downto 0) <= IDEX.PC;
         end if;
-        -- Choosing the second operand (two layers of multiplexors)
-        case (ForwardB) is
-            when OP_IDEX =>
-                ALUOperand2m <= IDEX.Data2;
-            when OP_EXMEM =>
-                ALUOperand2m <= EXMEM.Result;
-            when others => -- OP_MEMWB
-                ALUOperand2m <= WriteData;
-        end case;
+        -- Choosing the second operand
         if (IDEX.EX.ALUSrcB = '0') then
             ALUOperand2 <= ALUOperand2m;
         else
