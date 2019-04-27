@@ -36,6 +36,7 @@ package includes is
     constant BAUD_RATE : natural := 115200; -- Used in course 02203 at DTU
 
     -- Pipeline relevant constants
+    constant MAX_FO : natural := 100;
     constant RF_ADDR_WIDTH : natural := 5;
     constant BYTE_WIDTH : natural := 8;
     constant MEM_ADDR_WIDTH : natural := 16;
@@ -48,7 +49,7 @@ package includes is
 
     -- Test file for the instruction memory and for simulation of the pipeline
     constant INIT_RAM : std_logic := '1';
-    constant TEST_FILE : string := "../tests/s_tests/test_load.bin";
+    constant TEST_FILE : string := "../tests/s_tests/test_raw.bin";
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;

@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This is a testbench for the pipeline.
 --              |
--- Revision     : 1.2   (last updated April 7, 2019)
+-- Revision     : 1.2   (last updated April 27, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -89,7 +89,7 @@ architecture rtl of pipeline_tb is
         );
     end component;
 begin
-    dut : pipeline 
+    dut : entity work.pipeline(rtl2)
     port map (
         clk => clk,
         reset => reset,
