@@ -49,7 +49,7 @@ package includes is
 
     -- Test file for the instruction memory and for simulation of the pipeline
     constant INIT_RAM : std_logic := '1';
-    constant TEST_FILE : string := "../tests/s_tests/test_raw.bin";
+    constant TEST_FILE : string := "../tests/s_tests/test_war.bin";
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;

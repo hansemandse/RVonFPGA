@@ -89,7 +89,7 @@ architecture rtl of pipeline_tb is
         );
     end component;
 begin
-    dut : entity work.pipeline(rtl2)
+    dut : entity work.pipeline(rtl3)
     port map (
         clk => clk,
         reset => reset,
@@ -136,7 +136,7 @@ begin
         end loop;
         reset <= '0';
         -- Run through the instructions
-        for i in 0 to instr_count+5 loop
+        for i in 0 to instr_count+15 loop
             wait until falling_edge(clk);
         end loop;
         wait until falling_edge(clk);

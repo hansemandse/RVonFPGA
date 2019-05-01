@@ -1,5 +1,5 @@
 -- This architecture implements a six stage pipeline
-architecture rtl2 of pipeline is
+architecture rtl3 of pipeline is
     attribute max_fanout : integer;
     -- Declarations for the register control signals
     type alu_op_t is (ALU_AND, ALU_OR, ALU_XOR, ALU_ADD, ALU_SUB, ALU_SLT, ALU_SLTU,
@@ -31,11 +31,6 @@ architecture rtl2 of pipeline is
     end record ControlEX_t;
     constant EX_reset : ControlEX_t := (Branch => BR_NOP, ALUOp => ALU_NOP, 
                                         ALUSrcA | ALUSrcB => '0');
-    type ControlEX2_t is record
-        Branch : branch_t;
-        ALUOp : alu_op_t;
-    end record ControlEX2_t;
-    constant EX2_reset : ControlEX2_t := (Branch => BR_NOP, ALUOp => ALU_NOP);
 
     -- Declarations for the IFID register
     type IFID_t is record
@@ -74,17 +69,13 @@ architecture rtl2 of pipeline is
         -- Control signals
         WB : ControlWB_t;
         M : ControlM_t;
-        EX2 : ControlEX2_t;
         -- Data signals
         PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
-        ALUOperand1 : std_logic_vector(DATA_WIDTH-1 downto 0);
-        ALUOperand1m : std_logic_vector(DATA_WIDTH-1 downto 0);
-        ALUOperand2 : std_logic_vector(DATA_WIDTH-1 downto 0);
+        Result : std_logic_vector(DATA_WIDTH-1 downto 0);
         ALUOperand2m : std_logic_vector(DATA_WIDTH-1 downto 0);
         RegisterRd : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
     end record IDEX2_t;
-    constant IDEX2_reset : IDEX2_t := (WB => WB_reset, M => M_reset, EX2 => EX2_reset,
-                                       PCp4 | ALUOperand1 | ALUOperand1m | ALUOperand2 |
+    constant IDEX2_reset : IDEX2_t := (WB => WB_reset, M => M_reset, PCp4 | Result | 
                                        ALUOperand2m | RegisterRd => (others => '0'));
 
     -- Declarations for the EXMEM register
@@ -199,7 +190,7 @@ begin
 
     -- Connecting the data memory ports
     DMemOp <= IDEX2.M.MemOp;
-    DAddr <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+    DAddr <= IDEX2.Result(MEM_ADDR_WIDTH-1 downto 0);
     MEMWB_next.MemData <= DReadData;
     DWriteData <= IDEX2.ALUOperand2m;
 
@@ -239,8 +230,6 @@ begin
         IDEX_next.RegisterRd <= rd;
 
         -- Updating values of the IDEX2 register
-        IDEX2_next.EX2.Branch <= IDEX.EX.Branch;
-        IDEX2_next.EX2.ALUOp <= IDEX.EX.ALUOp;
         IDEX2_next.M <= IDEX.M;
         IDEX2_next.WB <= IDEX.WB;
         IDEX2_next.PCp4 <= IDEX.PCp4; 
@@ -249,6 +238,7 @@ begin
         -- Updating values of the EXMEM register
         EXMEM_next.WB <= IDEX2.WB;
         EXMEM_next.PCp4 <= IDEX2.PCp4;
+        EXMEM_next.Result <= IDEX2.Result;
         EXMEM_next.RegisterRd <= IDEX2.RegisterRd;
 
         -- Updating values of the MEMWB register
@@ -504,7 +494,7 @@ begin
         -- Forwarding unit
         fA : if (IDEX2.WB.RegWrite = '1' and unsigned(IDEX2.RegisterRd) /= 0
                                          and IDEX2.RegisterRd = IDEX.RegisterRs1) then
-            ALUOperand1m <= ALUResult;
+            ALUOperand1m <= IDEX2.Result;
         elsif (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
                                          and EXMEM.RegisterRd = IDEX.RegisterRs1) then
             ALUOperand1m <= EXMEM.Result;
@@ -514,10 +504,9 @@ begin
         else
             ALUOperand1m <= IDEX.Data1;
         end if fA;
-        IDEX2_next.ALUOperand1m <= ALUOperand1m;
         fB : if (IDEX2.WB.RegWrite = '1' and unsigned(IDEX2.RegisterRd) /= 0
                                          and IDEX2.RegisterRd = IDEX.RegisterRs2) then
-            ALUOperand2m <= ALUResult;
+            ALUOperand2m <= IDEX2.Result;
         elsif (EXMEM.WB.RegWrite = '1' and unsigned(EXMEM.RegisterRd) /= 0 
                                          and EXMEM.RegisterRd = IDEX.RegisterRs2) then
             ALUOperand2m <= EXMEM.Result;
@@ -532,39 +521,39 @@ begin
         -- Arithmetic circuit (ALU and its multiplexors)
         -- Choosing the first operand
         if (IDEX.EX.ALUSrcA = '0') then
-            IDEX2_next.ALUOperand1 <= ALUOperand1m;
+            ALUOperand1 <= ALUOperand1m;
         else
-            IDEX2_next.ALUOperand1 <= (others => '0');
-            IDEX2_next.ALUOperand1(MEM_ADDR_WIDTH-1 downto 0) <= IDEX.PC;
+            ALUOperand1 <= (others => '0');
+            ALUOperand1(MEM_ADDR_WIDTH-1 downto 0) <= IDEX.PC;
         end if;
         -- Choosing the second operand
         if (IDEX.EX.ALUSrcB = '0') then
-            IDEX2_next.ALUOperand2 <= ALUOperand2m;
+            ALUOperand2 <= ALUOperand2m;
         else
-            IDEX2_next.ALUOperand2 <= IDEX.Immediate;
+            ALUOperand2 <= IDEX.Immediate;
         end if;
         -- Instantiating the actual ALU which operates on the above two operands
         -- and outputs a result determined by the control circuit in the ID stage
         temp := (others => '0');
-        alu : case (IDEX2.EX2.ALUOp) is
+        alu : case (IDEX.EX.ALUOp) is
             when ALU_ADD =>
-                ALUResult <= std_logic_vector(signed(IDEX2.ALUOperand1) + signed(IDEX2.ALUOperand2));
+                ALUResult <= std_logic_vector(signed(ALUOperand1) + signed(ALUOperand2));
             when ALU_SUB =>
-                ALUResult <= std_logic_vector(signed(IDEX2.ALUOperand1) - signed(IDEX2.ALUOperand2));
+                ALUResult <= std_logic_vector(signed(ALUOperand1) - signed(ALUOperand2));
             when ALU_AND =>
-                ALUResult <= IDEX2.ALUOperand1 and IDEX2.ALUOperand2;
+                ALUResult <= ALUOperand1 and ALUOperand2;
             when ALU_OR =>
-                ALUResult <= IDEX2.ALUOperand1 or IDEX2.ALUOperand2;
+                ALUResult <= ALUOperand1 or ALUOperand2;
             when ALU_XOR =>
-                ALUResult <= IDEX2.ALUOperand1 xor IDEX2.ALUOperand2;
+                ALUResult <= ALUOperand1 xor ALUOperand2;
             when ALU_SLT =>
-                if (signed(IDEX2.ALUOperand1) < signed(IDEX2.ALUOperand2)) then
+                if (signed(ALUOperand1) < signed(ALUOperand2)) then
                     ALUResult <= (0 => '1', others => '0');
                 else 
                     ALUResult <= (others => '0');
                 end if;
             when ALU_SLTU =>
-                if (unsigned(IDEX2.ALUOperand1) < unsigned(IDEX2.ALUOperand2)) then
+                if (unsigned(ALUOperand1) < unsigned(ALUOperand2)) then
                     ALUResult <= (0 => '1', others => '0');
                 else 
                     ALUResult <= (others => '0');
@@ -572,59 +561,59 @@ begin
             when ALU_SLL =>
                 -- For RV64I, the shamt value is 6 bits for register-register instructions and
                 -- for doubleword-size immediate instructions
-                ALUResult <= std_logic_vector(shift_left(unsigned(IDEX2.ALUOperand1), 
-                                              to_integer(unsigned(IDEX2.ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_left(unsigned(ALUOperand1), 
+                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
             when ALU_SRL =>
-                ALUResult <= std_logic_vector(shift_right(unsigned(IDEX2.ALUOperand1), 
-                                              to_integer(unsigned(IDEX2.ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_right(unsigned(ALUOperand1), 
+                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
             when ALU_SRA =>
-                ALUResult <= std_logic_vector(shift_right(signed(IDEX2.ALUOperand1), 
-                                              to_integer(unsigned(IDEX2.ALUOperand2(5 downto 0)))));
+                ALUResult <= std_logic_vector(shift_right(signed(ALUOperand1), 
+                                              to_integer(unsigned(ALUOperand2(5 downto 0)))));
             when ALU_ADDW =>
                 -- Adds together two 32-bit words and sign-extends the 32-bit result to 64 bits
-                temp(31 downto 0) := std_logic_vector(signed(IDEX2.ALUOperand1(31 downto 0)) 
-                                                    + signed(IDEX2.ALUOperand2(31 downto 0)));
+                temp(31 downto 0) := std_logic_vector(signed(ALUOperand1(31 downto 0)) 
+                                                    + signed(ALUOperand2(31 downto 0)));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SUBW =>
                 -- Same as above but with subtraction
-                temp(31 downto 0) := std_logic_vector(signed(IDEX2.ALUOperand1(31 downto 0)) 
-                                                    - signed(IDEX2.ALUOperand2(31 downto 0)));
+                temp(31 downto 0) := std_logic_vector(signed(ALUOperand1(31 downto 0)) 
+                                                    - signed(ALUOperand2(31 downto 0)));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SLLW =>
                 -- Shifts the low 32 bits of the first operand and sign-extends the result
-                temp(31 downto 0) := std_logic_vector(shift_left(unsigned(IDEX2.ALUOperand1(31 downto 0)),
-                                                      to_integer(unsigned(IDEX2.ALUOperand2(4 downto 0)))));
+                temp(31 downto 0) := std_logic_vector(shift_left(unsigned(ALUOperand1(31 downto 0)),
+                                                      to_integer(unsigned(ALUOperand2(4 downto 0)))));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SRLW =>
-                temp(31 downto 0) := std_logic_vector(shift_right(unsigned(IDEX2.ALUOperand1(31 downto 0)),
-                                                      to_integer(unsigned(IDEX2.ALUOperand2(4 downto 0)))));
+                temp(31 downto 0) := std_logic_vector(shift_right(unsigned(ALUOperand1(31 downto 0)),
+                                                      to_integer(unsigned(ALUOperand2(4 downto 0)))));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when ALU_SRAW =>
-                temp(31 downto 0) := std_logic_vector(shift_right(signed(IDEX2.ALUOperand1(31 downto 0)),
-                                                      to_integer(unsigned(IDEX2.ALUOperand2(4 downto 0)))));
+                temp(31 downto 0) := std_logic_vector(shift_right(signed(ALUOperand1(31 downto 0)),
+                                                      to_integer(unsigned(ALUOperand2(4 downto 0)))));
                 ALUResult <= (others => temp(31));
                 ALUResult(30 downto 0) <= temp(30 downto 0);
             when others => -- ALU_NOP
                 -- The second operand is passed through to allow LUI to work more easily
-                ALUResult <= IDEX2.ALUOperand2;
+                ALUResult <= ALUOperand2;
         end case alu;
-        EXMEM_next.Result <= ALUResult;
+        IDEX2_next.Result <= ALUResult;
         -- Code for the branch detection circuitry
-        if (unsigned(IDEX2.ALUOperand1m) = unsigned(IDEX2.ALUOperand2m)) then
+        if (unsigned(ALUOperand1m) = unsigned(ALUOperand2m)) then
             Zero <= '1';
         else
             Zero <= '0';
         end if;
-        if (unsigned(IDEX2.ALUOperand1m) < unsigned(IDEX2.ALUOperand2m)) then
+        if (unsigned(ALUOperand1m) < unsigned(ALUOperand2m)) then
             LessThanU <= '1';
         else
             LessThanU <= '0';
         end if;
-        if (signed(IDEX2.ALUOperand1m) < signed(IDEX2.ALUOperand2m)) then
+        if (signed(ALUOperand1m) < signed(ALUOperand2m)) then
             LessThan <= '1';
         else 
             LessThan <= '0';
@@ -635,13 +624,13 @@ begin
         pc_inc := std_logic_vector(unsigned(pc) + 4);
         pc_dec := std_logic_vector(unsigned(pc) - 4);
         IFID_next.PCp4 <= pc_inc;
-        br : case (IDEX2.EX2.Branch) is
+        br : case (IDEX.EX.Branch) is
             when BR_J =>
-                Flush <= FLUSH_BOTH;
+                Flush <= FLUSH_IDEX;
                 IFID_next.SkipInstr <= '1';
                 pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
             when BR_JR =>
-                Flush <= FLUSH_BOTH;
+                Flush <= FLUSH_IDEX;
                 IFID_next.SkipInstr <= '1';
                 pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 1) & '0';
             when BR_EQ =>
@@ -759,7 +748,6 @@ begin
                     IDEX.M <= M_reset;
                     IDEX.WB <= WB_reset;
                     IDEX2 <= IDEX2_next;
-                    IDEX2.EX2 <= EX2_reset;
                     IDEX2.M <= M_reset;
                     IDEX2.WB <= WB_reset;
                 elsif (Flush = FLUSH_IDEX) then
@@ -778,4 +766,4 @@ begin
         end if;
     end process regs;
 
-end rtl2;
+end rtl3;
