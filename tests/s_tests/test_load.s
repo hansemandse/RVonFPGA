@@ -29,6 +29,14 @@ nop
 # Read data out once again
 ld a4, 0(sp) # Expected result 0x010203040A0C0EFE
 andi a5, a4, 0xF0 # Expected result 0x00000000000000F0 (hazard)
+nop
+nop
+nop
+# Read data out once again
+ld a6, 0(sp)
+nop
+nop
+srli a6, a6, 32 # Expected result 0x0000000001020304 (hazard 7-stage)
 addi sp, sp, 8 # Restore stack pointer
 nop
 nop

@@ -25,7 +25,7 @@ use std.textio.all;
 package includes is
     -- Clock divider relevant constants
     constant CLOCK_F : natural := 100_000_000;
-    constant CLOCK_DIV : natural := 2;
+    constant CLOCK_DIV : natural := 1;
     constant CLOCK_F_INT : natural := CLOCK_F / CLOCK_DIV;
 
     -- Memory operations
