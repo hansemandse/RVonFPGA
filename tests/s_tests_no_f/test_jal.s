@@ -1,5 +1,5 @@
 # Load test operands
-li a0, 0x0102030405060708
+li a0, 1
 # Perform jump to specific code location
 nop
 nop
@@ -12,8 +12,12 @@ nop
 nop
 # Jump to here
 main:
-add a1, x0, a0 # Expected result 0x0102030405060708
+add a1, x0, a0 # Expected result 1
 addi ra, ra, 8
+nop
+nop
+nop
+nop
 jalr ra
 add a0, a0, a0 # Must not be performed
 add a0, a0, a0 # Must not be performed
@@ -22,7 +26,7 @@ nop
 nop
 # Jump to here
 end:
-add a2, a0, a0 # Expected result 0x020406080A0C0E10
+add a2, a0, a0 # Expected result 2
 nop
 nop
 nop

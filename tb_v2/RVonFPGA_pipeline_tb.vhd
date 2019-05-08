@@ -89,7 +89,7 @@ architecture rtl of pipeline_tb is
         );
     end component;
 begin
-    dut : entity work.pipeline(rtl4)
+    dut : entity work.pipeline(rtl)
     port map (
         clk => clk,
         reset => reset,

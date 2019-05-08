@@ -4,7 +4,11 @@ li a0, 0xA
 nop
 nop
 nop
-srli a0, a0, 4 # Expected result 0x0000000000000000
+srli a0, a0, 4 # Expected result 0
+nop
+nop
+nop
+nop
 beq a0, x0, skip
 addi a0, x0, 1 # This instruction should be flushed
 addi a0, x0, 1 # This instruction should be flushed
