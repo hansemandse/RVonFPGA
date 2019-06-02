@@ -7,3 +7,4 @@ serial/__pycache__
 serial/build
 serial/test.py
 *.exe
+*.srec
