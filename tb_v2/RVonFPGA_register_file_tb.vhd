@@ -1,20 +1,22 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in
+--              : cooperation with the Institute of Mathematics and
+--              : Computer Science.
 --              : This is a testbench for the register file.
 --              |
--- Revision     : 1.2   (last updated April 5, 2019)
+-- Revision     : 1.2   (last updated June 6, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -87,15 +89,23 @@ begin
         -- Testing that register 0 reads out 0
         RegWrite <= '0';
         wait until falling_edge(clk);
-        assert unsigned(Data1) = 0 report "Register 0 does not output 0!" severity FAILURE;
-        assert unsigned(Data2) = 0 report "Register 0 does not output 0!" severity FAILURE;
+        assert unsigned(Data1) = 0 
+            report "Register 0 does not output 0!" 
+            severity FAILURE;
+        assert unsigned(Data2) = 0 
+            report "Register 0 does not output 0!" 
+            severity FAILURE;
         report "Write test to register 0 passed!" severity NOTE;
         -- Testing that the previously stored data is output
         rs1 <= "01010";
         rs2 <= "10010";
         wait until falling_edge(clk);
-        assert Data1 = TEST_DATA report "Register outputs incorrect data!" severity FAILURE;
-        assert Data2 = TEST_DATA report "Register outputs incorrect data!" severity FAILURE;
+        assert Data1 = TEST_DATA 
+            report "Register outputs incorrect data!" 
+            severity FAILURE;
+        assert Data2 = TEST_DATA 
+            report "Register outputs incorrect data!" 
+            severity FAILURE;
         report "Write test passed!" severity NOTE;
         -- Testing the forwarding hardware
         RegWrite <= '1';
@@ -103,14 +113,22 @@ begin
         rs1 <= "00100";
         rs2 <= "00100";
         wait until falling_edge(clk);
-        assert Data1 = TEST_DATA report "Forwarding is incorrect on port 1!" severity FAILURE;
-        assert Data2 = TEST_DATA report "Forwarding is incorrect on port 2!" severity FAILURE;
+        assert Data1 = TEST_DATA 
+            report "Forwarding is incorrect on port 1!" 
+            severity FAILURE;
+        assert Data2 = TEST_DATA 
+            report "Forwarding is incorrect on port 2!" 
+            severity FAILURE;
         rd <= "00000";
         rs1 <= "00000";
         rs2 <= "00000";
         wait until falling_edge(clk);
-        assert unsigned(Data1) = 0 report "Forwarding is incorrect on port 1!" severity FAILURE;
-        assert unsigned(Data2) = 0 report "Forwarding is incorrect on port 2!" severity FAILURE;
+        assert unsigned(Data1) = 0 
+            report "Forwarding is incorrect on port 1!" 
+            severity FAILURE;
+        assert unsigned(Data2) = 0 
+            report "Forwarding is incorrect on port 2!" 
+            severity FAILURE;
         report "Forwarding test passed!" severity NOTE;
 
         std.env.stop(0);
