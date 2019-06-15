@@ -11,8 +11,10 @@ nop
 nop
 nop
 # Read data out and work on it
+add a7, a0, zero
 ld a1, 0(sp) # Expected result 0x0102030405060708
 add a1, a1, a0 # Expected result 0x020406080A0C0E10 (hazard)
+addi a7, a7, 0x10 # Expected result 0x0102030405060718
 xori a1, a1, 0x10 # Expected result 0x020406080A0C0E00
 sw a1, 0(sp) # Expected memory content 0x010203040A0C0E00 (forwarding)
 nop
@@ -41,4 +43,3 @@ addi sp, sp, 8 # Restore stack pointer
 nop
 nop
 nop
-ecall

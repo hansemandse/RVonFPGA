@@ -18,4 +18,3 @@ addi a0, a0, 3 # Expected result 0x0000000000000003
 nop
 nop
 nop
-ecall

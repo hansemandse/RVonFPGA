@@ -26,4 +26,3 @@ add a2, a0, a0 # Expected result 0x020406080A0C0E10
 nop
 nop
 nop
-ecall

@@ -13,4 +13,3 @@ addi sp, sp, 8 # Restore stack pointer
 nop
 nop
 nop
-ecall
