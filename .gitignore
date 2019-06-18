@@ -8,3 +8,4 @@ serial/build
 serial/test.py
 *.exe
 *.srec
+src_v2/RVonFPGA_memory_noaddr.vhd

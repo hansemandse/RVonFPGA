@@ -1,5 +1,6 @@
 -- This architecture implements a five stage pipeline
 architecture rtl of pipeline is
+    attribute max_fanout : integer;
     -- Declarations for the register control signals
     type alu_op_t is (ALU_AND, ALU_OR, ALU_XOR, ALU_ADD, ALU_SUB, ALU_SLT, ALU_SLTU,
                       ALU_SLL, ALU_SRL, ALU_SRA, ALU_ADDW, ALU_SUBW, ALU_SLLW, 
@@ -35,8 +36,8 @@ architecture rtl of pipeline is
     type IFID_t is record
         SkipInstr : std_logic;
         IMemOp : mem_op_t;
-        PC : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
-        PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+        PC : std_logic_vector(DATA_WIDTH-1 downto 0);
+        PCp4 : std_logic_vector(DATA_WIDTH-1 downto 0);
     end record IFID_t;
     constant IFID_reset : IFID_t := (SkipInstr => '0', IMemOp => MEM_NOP, 
                                      PC => PC_reset, PCp4 => PCp4_reset);
@@ -49,14 +50,14 @@ architecture rtl of pipeline is
         EX : ControlEX_t;
         IMemOp : mem_op_t;
         -- Data signals
-        PC : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
-        PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+        PC : std_logic_vector(DATA_WIDTH-1 downto 0);
+        PCp4 : std_logic_vector(DATA_WIDTH-1 downto 0);
         Immediate : std_logic_vector(DATA_WIDTH-1 downto 0);
         Data1 : std_logic_vector(DATA_WIDTH-1 downto 0);
         Data2 : std_logic_vector(DATA_WIDTH-1 downto 0);
-        RegisterRs1 : std_logic_vector(4 downto 0);
-        RegisterRs2 : std_logic_vector(4 downto 0);
-        RegisterRd : std_logic_vector(4 downto 0);
+        RegisterRs1 : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
+        RegisterRs2 : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
+        RegisterRd : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
     end record IDEX_t;
     constant IDEX_reset : IDEX_t := (WB => WB_reset, M => M_reset, EX => EX_reset,
                                      IMemOp => MEM_NOP, PC => PC_reset, PCp4 => PCp4_reset,
@@ -68,9 +69,9 @@ architecture rtl of pipeline is
         -- Control signals
         WB : ControlWB_t;
         -- Data signals
-        PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+        PCp4 : std_logic_vector(DATA_WIDTH-1 downto 0);
         Result : std_logic_vector(DATA_WIDTH-1 downto 0);
-        RegisterRd : std_logic_vector(4 downto 0);
+        RegisterRd : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
     end record EXMEM_t;
     constant EXMEM_reset : EXMEM_t := (WB => WB_reset, PCp4 => PCp4_reset,
                                        Result | RegisterRd => (others => '0'));
@@ -80,42 +81,42 @@ architecture rtl of pipeline is
         -- Control signals
         WB : ControlWB_t;
         -- Data signals
-        PCp4 : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+        PCp4 : std_logic_vector(DATA_WIDTH-1 downto 0);
         MemData : std_logic_vector(DATA_WIDTH-1 downto 0);
         Result : std_logic_vector(DATA_WIDTH-1 downto 0);
-        RegisterRd : std_logic_vector(4 downto 0);
+        RegisterRd : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
     end record MEMWB_t;
     constant MEMWB_reset : MEMWB_t := (WB => WB_reset, PCp4 => PCp4_reset, 
                                        MemData | Result | RegisterRd => (others => '0'));
 
     -- Declarations for the PC
-    signal pc, pc_next : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+    signal pc, pc_next : std_logic_vector(DATA_WIDTH-1 downto 0);
+    attribute max_fanout of pc : signal is MAX_FO;
 
     -- Declarations for the IFID register
     signal IFID, IFID_next : IFID_t;
+    attribute max_fanout of IFID : signal is MAX_FO;
 
     -- Declarations for the IDEX register
     signal IDEX, IDEX_next : IDEX_t;
+    attribute max_fanout of IDEX : signal is MAX_FO;
 
     -- Declarations for the EXMEM register
     signal EXMEM, EXMEM_next : EXMEM_t;
-
-    attribute max_fanout : integer;
-    attribute max_fanout of EXMEM : signal is 50;
+    attribute max_fanout of EXMEM : signal is MAX_FO;
 
     -- Declarations for the MEMWB register
     signal MEMWB, MEMWB_next : MEMWB_t;
-
-    attribute max_fanout of MEMWB : signal is 50;
+    attribute max_fanout of MEMWB : signal is MAX_FO;
 
     -- Signals for the ID stage
-    signal Instruction : std_logic_vector(31 downto 0);
+    signal Instruction : std_logic_vector(INSTR_WIDTH-1 downto 0);
     --attribute DONT_TOUCH : string;
     --attribute DONT_TOUCH of Instruction : signal is "true";
-    signal IBuf, IBuf_next : std_logic_vector(31 downto 0);
+    signal IBuf, IBuf_next : std_logic_vector(INSTR_WIDTH-1 downto 0);
     signal opcode, funct7 : std_logic_vector(6 downto 0);
     signal funct3 : std_logic_vector(2 downto 0);
-    signal rs1, rs2, rd : std_logic_vector(4 downto 0);
+    signal rs1, rs2, rd : std_logic_vector(RF_ADDR_WIDTH-1 downto 0);
     signal InsertNOP : std_logic;
 
     -- Signals for the EX stage
@@ -171,14 +172,14 @@ begin
 
     -- Connecting the memory ports
     DMemOp <= IDEX.M.MemOp;
-    DAddr <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+    DAddr <= ALUResult;
     DWriteData <= ALUOperand2m;
 
     -- Process describing all combinational parts of the circuit
     comb: process (all)
         -- Temporary variable used in the ALU for word operations
         variable temp : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
-        variable pc_inc, pc_dec : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '0');
+        variable pc_inc : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
     begin
         -- Default assignments for all register-related signals
         pc_next <= pc;
@@ -220,7 +221,7 @@ begin
         MEMWB_next.RegisterRd <= EXMEM.RegisterRd;
 
         -- Instruction fetch-related updates
-        IBuf_next <= IReadData(DATA_WIDTH-1 downto DATA_WIDTH/2);
+        IBuf_next <= IReadData(DATA_WIDTH-1 downto INSTR_WIDTH);
         if (IFID.IMemOp = MEM_LD and IFID.PCp4 = pc) then
             -- Memory just performed a LD operation meaning that two instructions are
             -- available in the pipeline (one to be run straight away, the other to be
@@ -242,7 +243,7 @@ begin
         elsif (IFID.SkipInstr = '1') then
             Instruction <= NOP;
         else
-            Instruction <= IReadData(DATA_WIDTH/2-1 downto 0);
+            Instruction <= IReadData(INSTR_WIDTH-1 downto 0);
         end if;
 
 
@@ -488,8 +489,7 @@ begin
         if (IDEX.EX.ALUSrcA = '0') then
             ALUOperand1 <= ALUOperand1m;
         else
-            ALUOperand1 <= (others => '0');
-            ALUOperand1(MEM_ADDR_WIDTH-1 downto 0) <= IDEX.PC;
+            ALUOperand1 <= IDEX.PC;
         end if;
         -- Choosing the second operand
         if (IDEX.EX.ALUSrcB = '0') then
@@ -587,22 +587,21 @@ begin
         -- Branch logic in the EX stage
         InsertNOP <= '0';
         pc_inc := std_logic_vector(unsigned(pc) + 4);
-        pc_dec := std_logic_vector(unsigned(pc) - 4);
         IFID_next.PCp4 <= pc_inc;
         br : case (IDEX.EX.Branch) is
             when BR_J =>
                 InsertNOP <= '1';
                 IFID_next.SkipInstr <= '1';
-                pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                pc_next <= ALUResult;
             when BR_JR =>
                 InsertNOP <= '1';
                 IFID_next.SkipInstr <= '1';
-                pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 1) & '0';
+                pc_next <= ALUResult(DATA_WIDTH-1 downto 1) & '0';
             when BR_EQ =>
                 if (Zero = '1') then
                     InsertNOP <= '1';
                     IFID_next.SkipInstr <= '1';
-                    pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                    pc_next <= ALUResult;
                 else
                     pc_next <= pc_inc;
                 end if;
@@ -610,7 +609,7 @@ begin
                 if (Zero = '0') then
                     InsertNOP <= '1';
                     IFID_next.SkipInstr <= '1';
-                    pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                    pc_next <= ALUResult;
                 else
                     pc_next <= pc_inc;
                 end if;
@@ -618,7 +617,7 @@ begin
                 if (LessThan = '1') then
                     InsertNOP <= '1';
                     IFID_next.SkipInstr <= '1';
-                    pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                    pc_next <= ALUResult;
                 else
                     pc_next <= pc_inc;
                 end if;
@@ -626,7 +625,7 @@ begin
                 if (LessThan = '0') then
                     InsertNOP <= '1';
                     IFID_next.SkipInstr <= '1';
-                    pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                    pc_next <= ALUResult;
                 else
                     pc_next <= pc_inc;
                 end if;
@@ -634,7 +633,7 @@ begin
                 if (LessThanU = '1') then
                     InsertNOP <= '1';
                     IFID_next.SkipInstr <= '1';
-                    pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                    pc_next <= ALUResult;
                 else
                     pc_next <= pc_inc;
                 end if;
@@ -642,17 +641,18 @@ begin
                 if (LessThanU = '0') then
                     InsertNOP <= '1';
                     IFID_next.SkipInstr <= '1';
-                    pc_next <= ALUResult(MEM_ADDR_WIDTH-1 downto 0);
+                    pc_next <= ALUResult;
                 else
                     pc_next <= pc_inc;
                 end if;
             when others => -- NOP
-                if (pc /= PC_MAX and opcode /= "1110011") then
+                if (pc /= PC_MAX) then
                     if (is_read_op(IDEX.M.MemOp) and 
                        (IDEX.RegisterRd = rs1 or IDEX.RegisterRd = rs2)) then
                         -- Load-use hazard detected, go back one instruction
                         InsertNOP <= '1';
-                        pc_next <= pc_dec;
+                        IFID_next.SkipInstr <= '1';
+                        pc_next <= IDEX.PCp4;
                     elsif (IReady = '0') then
                         -- Instruction memory is not ready, wait for a clock cycle
                         pc_next <= pc;
@@ -661,7 +661,7 @@ begin
                         pc_next <= pc_inc;
                     end if;
                 else
-                    -- If an ECALL is in the ID-stage or the last memory address has
+                    -- If the last memory address has
                     -- been reached, stop the execution
                     pc_next <= pc;
                 end if;
@@ -674,8 +674,7 @@ begin
             when WB_MEM =>
                 WriteData <= MEMWB.MemData;
             when others => -- WB_PCp4
-                WriteData <= (others => '0');
-                WriteData(MEM_ADDR_WIDTH-1 downto 0) <= MEMWB.PCp4;
+                WriteData <= MEMWB.PCp4;
         end case wb;
     end process comb;
 

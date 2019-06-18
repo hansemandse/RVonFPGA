@@ -1,21 +1,23 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
---              : This file contains all of the type definitions required in the pipeline
---              : and in the memories.
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in
+--              : cooperation with the Institute of Mathematics and
+--              : Computer Science.
+--              : This file contains all of the type definitions required
+--              : in the pipeline and in the memories.
 --              |
--- Revision     : 2.0   (last updated April 11, 2019)
+-- Revision     : 2.1   (last updated June 15, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -40,16 +42,17 @@ package includes is
     constant RF_ADDR_WIDTH : natural := 5;
     constant BYTE_WIDTH : natural := 8;
     constant MEM_ADDR_WIDTH : natural := 16;
+    constant INSTR_WIDTH : natural := 32;
     constant DATA_WIDTH : natural := 64;
-    constant PC_reset : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '0');
-    constant PCp4_reset : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (2 => '1', others => '0');
-    constant PC_MAX : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0) := (others => '1');
+    constant PC_reset : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+    constant PCp4_reset : std_logic_vector(DATA_WIDTH-1 downto 0) := (2 => '1', others => '0');
+    constant PC_MAX : std_logic_vector(DATA_WIDTH-1 downto 0) := (1 downto 0 => '0', others => '1');
     -- Hardcoded NOP instruction (ADDI x0, x0, 0) used for branching
     constant NOP : std_logic_vector(31 downto 0) := x"00000013";
 
     -- Test file for the instruction memory and for simulation of the pipeline
     constant INIT_RAM : std_logic := '1';
-    constant TEST_FILE : string := "../tests/s_tests/test_war.bin";
+    constant TEST_FILE : string := "../tests/s_tests/test_load.bin";
 
     -- Function to get number of instructions in test file
     impure function get_instr_count (f : string) return natural;

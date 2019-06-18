@@ -1,21 +1,23 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
---              : This entity represents the top entity interconnecting the pipeline, the
---              : clock divider and the UART controller.
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in
+--              : cooperation with the Institute of Mathematics and
+--              : Computer Science.
+--              : This entity represents the top entity interconnecting
+--              : the pipeline, the clock divider and the UART controller.
 --              |
--- Revision     : 1.1   (last updated April 24, 2019)
+-- Revision     : 1.2   (last updated June 18, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -42,11 +44,11 @@ architecture rtl of top is
 
     signal IMemOp : mem_op_t;
     signal IReady : std_logic;
-    signal IAddr : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+    signal IAddr : std_logic_vector(DATA_WIDTH-1 downto 0);
     signal IReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
     signal DMemOp : mem_op_t;
-    signal DAddr : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+    signal DAddr : std_logic_vector(DATA_WIDTH-1 downto 0);
     signal DWriteData, DReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
     signal UMemOp : mem_op_t;
@@ -61,11 +63,11 @@ architecture rtl of top is
             -- Instruction memory interface
             IMemOp : out mem_op_t;
             IReady : in std_logic;
-            IAddr : out std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+            IAddr : out std_logic_vector(DATA_WIDTH-1 downto 0);
             IReadData : in std_logic_vector(DATA_WIDTH-1 downto 0);
             -- Data memory interface
             DMemOp : out mem_op_t;
-            DAddr : out std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+            DAddr : out std_logic_vector(DATA_WIDTH-1 downto 0);
             DWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0);
             DReadData : in std_logic_vector(DATA_WIDTH-1 downto 0)
         );
@@ -170,12 +172,12 @@ begin
         reset => reset,
         ImemOp => IMemOp,
         IReady => IReady,
-        IAddr => IAddr,
+        IAddr => IAddr(MEM_ADDR_WIDTH-1 downto 0),
         IWriteData => (others => '0'),
         IReadData => IReadData,
         DMemOp => DMemOp,
         DReady => open,
-        DAddr => DAddr,
+        DAddr => DAddr(MEM_ADDR_WIDTH-1 downto 0),
         DWriteData => DWriteData,
         DReadData => DReadData,
         UMemOp => UMemOp,

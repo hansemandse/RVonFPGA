@@ -10,7 +10,7 @@
 --              : of Mathematics and Computer Science.
 --              : This is a testbench for the pipeline.
 --              |
--- Revision     : 1.2   (last updated April 27, 2019)
+-- Revision     : 1.3   (last updated June 15, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -38,7 +38,8 @@ architecture rtl of pipeline_tb is
     signal clk, reset : std_logic := '0';
     signal IReady : std_logic;
     signal IMemOp, DMemOp, UMemOp : mem_op_t;
-    signal IAddr, DAddr, UAddr : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+    signal IAddr, DAddr : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal UAddr : std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
     signal IReadData, DReadData, UReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
     signal DWriteData, UWriteData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
@@ -50,11 +51,11 @@ architecture rtl of pipeline_tb is
             -- Instruction memory interface
             IMemOp : out mem_op_t;
             IReady : in std_logic;
-            IAddr : out std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+            IAddr : out std_logic_vector(DATA_WIDTH-1 downto 0);
             IReadData : in std_logic_vector(DATA_WIDTH-1 downto 0);
             -- Data memory interface
             DMemOp : out mem_op_t;
-            DAddr : out std_logic_vector(MEM_ADDR_WIDTH-1 downto 0);
+            DAddr : out std_logic_vector(DATA_WIDTH-1 downto 0);
             DWriteData : out std_logic_vector(DATA_WIDTH-1 downto 0);
             DReadData : in std_logic_vector(DATA_WIDTH-1 downto 0)
         );
@@ -109,12 +110,12 @@ begin
         reset => reset,
         IMemOp => IMemOp,
         IReady => IReady,
-        IAddr => IAddr,
+        IAddr => IAddr(MEM_ADDR_WIDTH-1 downto 0),
         IReadData => IReadData,
         IWriteData => (others => '0'),
         DMemOp => DMemOp,
         DReady => open,
-        DAddr => DAddr,
+        DAddr => DAddr(MEM_ADDR_WIDTH-1 downto 0),
         DWriteData => DWriteData,
         DReadData => DReadData,
         UMemOp => UMemOp,
