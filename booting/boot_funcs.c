@@ -1,25 +1,29 @@
-// *******************************************************************************************
+// ***********************************************************************
 //              |
-// Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+// Title        : Implementation and Optimization of a RISC-V Processor on
+//              : a FPGA
 //              |
 // Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 //              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 //              |
-// Purpose      : This file is a part of a full system implemented as part of a bachelor's
-//              : thesis at DTU. The thesis is written in cooperation with the Institute
-//              : of Mathematics and Computer Science.
-//              : This code is a set of function wrappers for the low-level assembly implemented
-//              : functions of the bootloader such that these may be used by other C programs.
+// Purpose      : This file is a part of a full system implemented as part
+//              : of a bachelor's thesis at DTU. The thesis is written in
+//              : cooperation with the Institute of Mathematics and
+//              : Computer Science.
+//              : This code is a set of function wrappers for the
+//              : low-level assembly implemented functions of the
+//              : bootloader such that these may be used by other C
+//              : programs.
 //              |
-// Revision     : 1.0   (last updated May 31, 2019)
+// Revision     : 1.0   (last updated June 20, 2019)
 //              |
 // Available at : https://github.com/hansemandse/RVonFPGA
 //              |
-// *******************************************************************************************
+// ***********************************************************************
 
 #include "boot_funcs.h"
 
-static int START_EXEC_ADDR = 0x1000;
+static long START_EXEC_ADDR = 0x0000000080000000;
 
 char read_uart(void) {
     char ret;
@@ -112,21 +116,21 @@ int read_srec(void) {
             case '1':   // Data record (16-bit address)
                 address = (array[0] << 8) | array[1];
                 for (int i = 2; i < count-1; i++) {
-                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (address));
+                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (START_EXEC_ADDR | address));
                     address++;
                 }
                 break;
             case '2':   // Data record (24-bit address)
                 address = (array[0] << 16) | (array[1] << 8) | array[2];
                 for (int i = 3; i < count-1; i++) {
-                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (address));
+                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (START_EXEC_ADDR | address));
                     address++;
                 }
                 break;
             case '3':   // Data record (32-bit address)
                 address = (array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3];
                 for (int i = 4; i < count-1; i++) {
-                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (address));
+                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (START_EXEC_ADDR | address));
                     address++;
                 }
                 break;
@@ -137,13 +141,13 @@ int read_srec(void) {
             // Termination records contain only the start address for executing the program
             // contained in the SREC file - this is why it is set globally allowing jumps
             case '7':   // Termination record (16-bit address)
-                START_EXEC_ADDR = (array[0] << 8) | array[1];
+                START_EXEC_ADDR |= (array[0] << 8) | array[1];
                 break;
             case '8':   // Termination record (24-bit address)
-                START_EXEC_ADDR = (array[0] << 16) | (array[1] << 8) | array[2];
+                START_EXEC_ADDR |= (array[0] << 16) | (array[1] << 8) | array[2];
                 break;
             case '9':   // Termination record (32-bit address)
-                START_EXEC_ADDR = (array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3];
+                START_EXEC_ADDR |= (array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3];
                 break;
             default:    // Header record (16-bit address)
                 // Data field only contains file identifiers, version and revision information
