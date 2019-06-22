@@ -15,7 +15,7 @@
 //              : bootloader such that these may be used by other C
 //              : programs.
 //              |
-// Revision     : 1.0   (last updated June 20, 2019)
+// Revision     : 1.0   (last updated June 22, 2019)
 //              |
 // Available at : https://github.com/hansemandse/RVonFPGA
 //              |
@@ -23,7 +23,7 @@
 
 #include "boot_funcs.h"
 
-static long START_EXEC_ADDR = 0x0000000080000000;
+#define MEM_START 0x1000000000000000
 
 char read_uart(void) {
     char ret;
@@ -42,13 +42,13 @@ void write_uart(char val) {
 
 char uart_data_ready(void) {
     char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STD_IN_ADDR));
+    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_IN_ADDR));
     return ret;
 }
 
 char uart_write_ready(void) {
     char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STD_OUT_ADDR));
+    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_OUT_ADDR));
     return ret;
 }
 
@@ -82,7 +82,7 @@ int read_srec(void) {
         type = read_uart();
         if (type < '0' || type > '9') {
             // Illegal type received - should be between '0'-'9'
-            return 1;
+            return -1;
         }
         // Read in the number of bytes expected
         array[0] = read_uart();
@@ -116,21 +116,21 @@ int read_srec(void) {
             case '1':   // Data record (16-bit address)
                 address = (array[0] << 8) | array[1];
                 for (int i = 2; i < count-1; i++) {
-                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (START_EXEC_ADDR | address));
+                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (MEM_START | address));
                     address++;
                 }
                 break;
             case '2':   // Data record (24-bit address)
                 address = (array[0] << 16) | (array[1] << 8) | array[2];
                 for (int i = 3; i < count-1; i++) {
-                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (START_EXEC_ADDR | address));
+                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (MEM_START | address));
                     address++;
                 }
                 break;
             case '3':   // Data record (32-bit address)
                 address = (array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3];
                 for (int i = 4; i < count-1; i++) {
-                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (START_EXEC_ADDR | address));
+                    asm("sb %[some], 0(%[some2])" : : [some]"r" (array[i]), [some2]"r" (MEM_START | address));
                     address++;
                 }
                 break;
@@ -141,14 +141,11 @@ int read_srec(void) {
             // Termination records contain only the start address for executing the program
             // contained in the SREC file - this is why it is set globally allowing jumps
             case '7':   // Termination record (16-bit address)
-                START_EXEC_ADDR |= (array[0] << 8) | array[1];
-                break;
+                return (array[0] << 8) | array[1];
             case '8':   // Termination record (24-bit address)
-                START_EXEC_ADDR |= (array[0] << 16) | (array[1] << 8) | array[2];
-                break;
+                return (array[0] << 16) | (array[1] << 8) | array[2];
             case '9':   // Termination record (32-bit address)
-                START_EXEC_ADDR |= (array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3];
-                break;
+                return (array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3];
             default:    // Header record (16-bit address)
                 // Data field only contains file identifiers, version and revision information
                 // - nothing is to be stored.
@@ -159,9 +156,4 @@ int read_srec(void) {
         // - this is performed by the while loop at the top of this function
     }
     return 0;
-}
-
-void start_exec(void) {
-    asm("jalr %[some]" : : [some]"r" (START_EXEC_ADDR));
-    return;
 }

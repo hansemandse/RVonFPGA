@@ -15,7 +15,7 @@
 #              : a reset and provides basic IO and program loading-related
 #              : functionality.
 #              |
-# Revision     : 1.0   (last updated June 19, 2019)
+# Revision     : 1.0   (last updated June 22, 2019)
 #              |
 # Available at : https://github.com/hansemandse/RVonFPGA
 #              |
@@ -30,8 +30,8 @@
     .section    .text.startup,"ax",@progbits
 
 # Constant definitions (addresses for UART, switches and LEDs and so on)
-    .equ    TEXT_START,         0x8000000000000000
-    .equ    SP_START,           0x800000000000F000
+    .equ    MEM_START,          0x1000000000000000
+    .equ    SP_START,           0x100000000000F000
 
 # Basic start up code that initializes the stack pointer and the global
 # pointer and jumps to the read_srec function - note that this function
@@ -41,7 +41,7 @@
     .globl  _start
     .type   _start, @function
 _start:
-    mv a0, x0
+    mv a0, zero
     jal write_led_hi
     jal write_led_lo
 init: 
@@ -53,8 +53,8 @@ init:
     la gp, __global_pointer$
     .option pop
     jal read_srec
-    beqz a0, final
-    # ADD ERROR HANDLING
+    li a1, MEM_START
+    or a0, a0, a1
 final:
-    j start_exec
+    jr a0
     .size   _start, .-_start
