@@ -1,18 +1,20 @@
-# ********************************************************************************************
+# ************************************************************************
 #				|
-# Title			: Implementation and Optimization of a RISC-V processor on a FPGA
+# Title			: Implementation and Optimization of a RISC-V processor on
+#				: a FPGA
 #				|
 # Developers	: Hans Jakob Damsgaard, Technical University of Denmark
 #				: s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 #				| 
-# Purpose		: This makefile serves the purpose of making the bootloader for the system
-#				: along with a set of functions available to test programs.
+# Purpose		: This makefile serves the purpose of making the
+#				: bootloader for the system along with a set of functions
+#				: available to test programs.
 #				|
-# Revision	    : 1.0 (last updated May 31, 2019)
+# Revision	    : 1.0 (last updated June 25, 2019)
 #				|
 # Available at  : https://github.com/hansemandse/RVonFPGA
 #				|	
-# ********************************************************************************************
+# ************************************************************************
 
 # Declarations of environment variables
 march := -march=rv64i # compile for RV64I ISA

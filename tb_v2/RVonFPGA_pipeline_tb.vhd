@@ -1,20 +1,22 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in
+--              : cooperation with the Institute of Mathematics and
+--              : Computer Science.
 --              : This is a testbench for the pipeline.
 --              |
--- Revision     : 1.3   (last updated June 15, 2019)
+-- Revision     : 1.3   (last updated June 25, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -33,8 +35,8 @@ architecture rtl of pipeline_tb is
     -- Number of clock cycles to run for
     constant instr_count : natural := get_instr_count(TEST_FILE);
 
-    -- Signals for interfacing the pipeline (it will likely be more interesting to
-    -- look into the register file in simulation than these)
+    -- Signals for interfacing the pipeline - it will likely be more
+    -- interesting to look into the register file in simulation than these
     signal clk, reset : std_logic := '0';
     signal IReady : std_logic;
     signal IMemOp, DMemOp, UMemOp : mem_op_t;
@@ -70,7 +72,7 @@ architecture rtl of pipeline_tb is
         port (
             clk, reset : in std_logic;
             -- Instruction memory interface
-            IMemOp : in mem_op_t; -- Includes a simple enable and write-enable structure
+            IMemOp : in mem_op_t;
             IReady : out std_logic;
             IAddr : in std_logic_vector(ADDR_WIDTH-1 downto 0);
             IWriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
@@ -90,7 +92,7 @@ architecture rtl of pipeline_tb is
         );
     end component;
 begin
-    dut : entity work.pipeline(rtl)
+    dut : entity work.pipeline(rtl3)
     port map (
         clk => clk,
         reset => reset,
