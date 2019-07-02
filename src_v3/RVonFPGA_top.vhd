@@ -8,9 +8,10 @@
 -- Purpose      : This file is a part of a full system implemented as part of a bachelor's
 --              : thesis at DTU. The thesis is written in cooperation with the Institute
 --              : of Mathematics and Computer Science.
---              : This is a testbench for the pipeline.
+--              : This entity represents the top entity interconnecting the pipeline, the
+--              : memories and the clock divider.
 --              |
--- Revision     : 1.4   (last updated June 28, 2019)
+-- Revision     : 2.0   (last updated July 2, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -23,30 +24,39 @@ use IEEE.numeric_std.all;
 library work;
 use work.includes.all;
 
-entity pipeline_tb is
-end pipeline_tb;
+entity top is
+    port (
+        clk, reset : in std_logic;
+        -- I/O on the test board
+        sw : in std_logic_vector(2*BYTE_WIDTH-1 downto 0);
+        leds : out std_logic_vector(2*BYTE_WIDTH-1 downto 0);
+        -- Serial communication with a PC
+        serial_tx : out std_logic;
+        serial_rx : in std_logic
+    );
+end top;
 
-architecture rtl of pipeline_tb is
-    -- Clock period in ns
-    constant clk_p : time := 10 ns;
-
-    -- Signals for interfacing the pipeline (it will likely be more interesting to
-    -- look into the register file in simulation than these)
-    signal clk, reset : std_logic := '0';
+architecture rtl of top is
+    -- Signals for interconnecting the components
+    signal clk_int : std_logic;
     signal IReady : std_logic;
-    signal IMemOp, DMemOp : mem_op_t;
-    signal IAddr, DAddr : std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal IReadData, DReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal DWriteData : std_logic_vector(DATA_WIDTH-1 downto 0);
 
-    -- Pipeline component declaration
-    component pipeline is
+    signal IMemOp : mem_op_t;
+    signal IAddr : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal IReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
+
+    signal DMemOp : mem_op_t;
+    signal DAddr : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal DWriteData, DReadData : std_logic_vector(DATA_WIDTH-1 downto 0);
+
+    -- The pipeline component
+    component pipeline
         port (
             -- Input ports
             clk, reset : in std_logic;
             -- Instruction memory interface
-            IMemOp : out mem_op_t;
             IReady : in std_logic;
+            IMemOp : out mem_op_t;
             IAddr : out std_logic_vector(DATA_WIDTH-1 downto 0);
             IReadData : in std_logic_vector(DATA_WIDTH-1 downto 0);
             -- Data memory interface
@@ -57,35 +67,45 @@ architecture rtl of pipeline_tb is
         );
     end component;
 
-    -- Memory component declaration
-    component memory is
+    -- The clock divider component
+    component clock_divider
         generic (
-            BLOCK_WIDTH : natural := BYTE_WIDTH;
-            ADDR_WIDTH : natural := MEM_ADDR_WIDTH
+            DIV : natural := CLOCK_DIV
         );
+        port (
+            clk_in, reset : in std_logic;
+            clk_out : out std_logic
+        );
+    end component;
+
+    -- The memory management component
+    component mem_man
         port (
             clk, reset : in std_logic;
             -- Instruction memory interface
-            IMemOp : in mem_op_t; -- Includes a simple enable and write-enable structure
             IReady : out std_logic;
-            IAddr : in std_logic_vector(ADDR_WIDTH-1 downto 0);
-            IWriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
+            IMemOp : in mem_op_t;
+            IAddr : in std_logic_vector(DATA_WIDTH-1 downto 0);
             IReadData : out std_logic_vector(DATA_WIDTH-1 downto 0);
             -- Data memory interface
             DMemOp : in mem_op_t;
-            DReady : out std_logic;
-            DAddr : in std_logic_vector(ADDR_WIDTH-1 downto 0);
+            DAddr : in std_logic_vector(DATA_WIDTH-1 downto 0);
             DWriteData : in std_logic_vector(DATA_WIDTH-1 downto 0);
-            DReadData : out std_logic_vector(DATA_WIDTH-1 downto 0)
+            DReadData : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            -- I/O interfaces
+            sw : in std_logic_vector(2*BYTE_WIDTH-1 downto 0);
+            leds : out std_logic_vector(2*BYTE_WIDTH-1 downto 0);
+            serial_tx : out std_logic;
+            serial_rx : in std_logic
         );
     end component;
 begin
-    dut : entity work.pipeline(rtl3)
-    port map (
-        clk => clk,
+    pip : pipeline
+    port map(
+        clk => clk_int,
         reset => reset,
-        IMemOp => IMemOp,
         IReady => IReady,
+        IMemOp => IMemOp,
         IAddr => IAddr,
         IReadData => IReadData,
         DMemOp => DMemOp,
@@ -94,42 +114,28 @@ begin
         DReadData => DReadData
     );
 
-    mem : memory
+    div : clock_divider
     port map (
-        clk => clk,
+        clk_in => clk,
         reset => reset,
-        IMemOp => IMemOp,
-        IReady => IReady,
-        IAddr => IAddr(MEM_ADDR_WIDTH-1 downto 0),
-        IReadData => IReadData,
-        IWriteData => (others => '0'),
-        DMemOp => DMemOp,
-        DReady => open,
-        DAddr => DAddr(MEM_ADDR_WIDTH-1 downto 0),
-        DWriteData => DWriteData,
-        DReadData => DReadData
+        clk_out => clk_int
     );
 
-    stimuli : process is
-    begin
-        -- Reset the pipeline before running it
-        reset <= '1';
-        for i in 0 to 4 loop
-            wait until falling_edge(clk);
-        end loop;
-        reset <= '0';
-        -- Run through the instructions
-        for i in 0 to 100 loop
-            wait until falling_edge(clk);
-        end loop;
-        wait until falling_edge(clk);
-
-        std.env.stop(0);
-    end process stimuli;
-
-    clock : process is
-    begin
-        clk <= '1'; wait for clk_p/2;
-        clk <= '0'; wait for clk_p/2;
-    end process clock;
+    man : mem_man
+    port map (
+        clk => clk_int,
+        reset => reset,
+        IReady => IReady,
+        IAddr => IAddr,
+        IMemOp => IMemOp,
+        IReadData => IReadData,
+        DMemOp => DMemOp,
+        DAddr => DAddr,
+        DWriteData => DWriteData,
+        DReadData => DReadData,
+        sw => sw,
+        leds => leds,
+        serial_tx => serial_tx,
+        serial_rx => serial_rx
+    );
 end rtl;

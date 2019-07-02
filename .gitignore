@@ -11,6 +11,5 @@ serial/test.py
 *.srec
 src_v2/RVonFPGA_memory_noaddr.vhd
 src_32
-src_v3
 src_no_forwarding
 timing

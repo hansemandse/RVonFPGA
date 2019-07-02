@@ -1,12 +1,3 @@
-// Constants for addressing the memory mapped I/O modules
-#define UART_DATA_ADDR      0x8000000000000001
-#define UART_STB_OUT_ADDR   0x8000000000000010
-#define UART_STB_IN_ADDR    0x8000000000000011
-#define LED_LO_ADDR         0x8000000000000100
-#define LED_HI_ADDR         0x8000000000000101
-#define SW_LO_ADDR          0x8000000000000100
-#define SW_HI_ADDR          0x8000000000000101
-
 // The following functions are defined in boot_funcs.c
 char read_uart(void);
 char uart_data_ready(void);

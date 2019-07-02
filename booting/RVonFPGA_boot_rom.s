@@ -15,7 +15,7 @@
 #              : a reset and provides basic IO and program loading-related
 #              : functionality.
 #              |
-# Revision     : 1.0   (last updated June 22, 2019)
+# Revision     : 1.0   (last updated July 2, 2019)
 #              |
 # Available at : https://github.com/hansemandse/RVonFPGA
 #              |

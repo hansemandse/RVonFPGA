@@ -10,7 +10,7 @@
 #				: bootloader for the system along with a set of functions
 #				: available to test programs.
 #				|
-# Revision	    : 1.0 (last updated June 25, 2019)
+# Revision	    : 1.0 (last updated June 28, 2019)
 #				|
 # Available at  : https://github.com/hansemandse/RVonFPGA
 #				|	
@@ -18,16 +18,20 @@
 
 # Declarations of environment variables
 march := -march=rv64i # compile for RV64I ISA
-mabi := -mabi=lp64 # define long as 64 bits, int as 32 bits, short as 16 bits and char as 8 bits
+mabi := -mabi=lp64 # define long as 64 bits, int as 32 bits, short as 16
+				   # bits and char as 8 bits
 nostd := -nostdlib # do not link any standard libraries
 nosu := -nostartfiles # do not add default start up code
-link := -Wl,-Ttext=0x0 # start the .text segment at address 0x0
-opt := -O3 # maximum optimization to minimize number of instructions resulting from compilation
+link := -Wl,-Ttext=0x0,-Tdata=0xF00 # start the .text and .data segments
+									# at these addresses
+opt := -O3 # maximum optimization to minimize number of instructions
+		   # resulting from compilation
 CC := riscv64-unknown-elf-gcc
 objcopy := riscv64-unknown-elf-objcopy
+objdump := riscv64-unknown-elf-objdump
 CFLAGS := $(march) $(mabi) $(nostd) $(nosu) $(link) $(opt)
 
-SRC := boot_rom.s boot_funcs.c
+SRC := RVonFPGA_boot_rom.s RVonFPGA_boot_funcs.c
 
 # Definition of make boot and make all
 .PHONY : all
@@ -35,7 +39,10 @@ all : boot
 .PHONY: boot
 boot :
 	$(CC) $(CFLAGS) $(SRC) -o boot.o
-	$(objcopy) boot.o --dump-section .text=boot.bin
+	$(objcopy) --remove-section .comment boot.o
+	$(objcopy) -O binary boot.o boot.bin
+	python romgen.py
+	$(objdump) -D -S -x boot.o > boot.s
 	@echo $@ successfully created
 
 # Definition of make clean

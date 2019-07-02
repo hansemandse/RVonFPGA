@@ -1,21 +1,23 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
---              : This entity represents the register file in a classic RISC-V pipeline.
---              : It has two read ports and one write port. 
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in
+--              : cooperation with the Institute of Mathematics and 
+--              : Computer Science.
+--              : This entity represents the register file in a classic
+--              : RISC-V pipeline with two read ports and one write port.
 --              |
--- Revision     : 2.0   (last updated April 4, 2019)
+-- Revision     : 2.0   (last updated June 28, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -26,7 +28,7 @@ use work.includes.all;
 
 entity register_file is
     generic (
-        ADDR_WIDTH : integer := 5;
+        ADDR_WIDTH : natural := 5;
         DATA_WIDTH : natural := 64
     );
     port (
@@ -45,11 +47,10 @@ entity register_file is
 end register_file;
 
 architecture rtl of register_file is
-    constant ARRAY_WIDTH : integer := 2 ** ADDR_WIDTH;
-    type register_file_t is array(ARRAY_WIDTH-1 downto 0) of std_logic_vector(DATA_WIDTH-1 downto 0);
+    constant ARRAY_WIDTH : natural := 2 ** ADDR_WIDTH;
+    type register_file_t is array(ARRAY_WIDTH-1 downto 1) of std_logic_vector(DATA_WIDTH-1 downto 0);
     signal regs : register_file_t := (others => (others => '0'));
 begin
-    -- Note that this implementation is synthesized to a large number of flip-flops by Vivado.
     rf : process (all)
     begin
         -- Synchronous writes and resets
@@ -70,7 +71,11 @@ begin
             end if;
         else
             -- Output data from the register file
-            Data1 <= regs(to_integer(unsigned(RegisterRs1)));
+            if (unsigned(RegisterRs1) /= 0) then
+                Data1 <= regs(to_integer(unsigned(RegisterRs1)));
+            else
+                Data1 <= (others => '0');
+            end if;
         end if;
         if (RegisterRs2 = RegisterRd and RegWrite = '1') then
             -- Forward data around the register file
@@ -81,7 +86,11 @@ begin
             end if;
         else
             -- Output data from the register file
-            Data2 <= regs(to_integer(unsigned(RegisterRs2)));
+            if (unsigned(RegisterRs2) /= 0) then
+                Data2 <= regs(to_integer(unsigned(RegisterRs2)));
+            else
+                Data2 <= (others => '0');
+            end if;
         end if;
     end process rf;
 end rtl;

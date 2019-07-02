@@ -15,20 +15,38 @@
 //              : bootloader such that these may be used by other C
 //              : programs.
 //              |
-// Revision     : 1.0   (last updated June 22, 2019)
+// Revision     : 1.0   (last updated July 2, 2019)
 //              |
 // Available at : https://github.com/hansemandse/RVonFPGA
 //              |
 // ***********************************************************************
 
-#include "boot_funcs.h"
+// Constants for addressing the memory mapped I/O modules
+#define UART_DATA_ADDR      0x8000000000000001
+#define UART_STB_OUT_ADDR   0x8000000000000002
+#define UART_STB_IN_ADDR    0x8000000000000003
+#define LED_LO_ADDR         0x8000000000000004
+#define LED_HI_ADDR         0x8000000000000005
+#define SW_LO_ADDR          0x8000000000000004
+#define SW_HI_ADDR          0x8000000000000005
+#define MEM_START           0x1000000000000000
 
-#define MEM_START 0x1000000000000000
+char uart_stb_in(void) {
+    char ret;
+    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_IN_ADDR));
+    return ret;
+}
+
+char uart_stb_out(void) {
+    char ret;
+    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_OUT_ADDR));
+    return ret;
+}
 
 char read_uart(void) {
     char ret;
     // If data is not ready, spin on the ready register
-    while (!uart_data_ready()) {}
+    while (!uart_stb_in()) {}
     // New data was available; read it into the variable ret
     asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_DATA_ADDR));
     return ret;
@@ -38,18 +56,6 @@ void write_uart(char val) {
     // Write the argument to the UART data register address
     asm("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (UART_DATA_ADDR));
     return;
-}
-
-char uart_data_ready(void) {
-    char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_IN_ADDR));
-    return ret;
-}
-
-char uart_write_ready(void) {
-    char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_OUT_ADDR));
-    return ret;
 }
 
 void write_led_lo(char val) {
