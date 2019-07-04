@@ -196,7 +196,7 @@ begin
                 MemOp_p <= MemOp;
             end if;
         end if;
-    end process;
+    end process reg;
 
     -- Generating the required number of block RAMs
     gen_brams : for i in 0 to NB_COL-1 generate

@@ -52,7 +52,7 @@ init:
     .option norelax
     la gp, __global_pointer$
     .option pop
-    jal read_srec
+    jal led_sw_test
     li a1, MEM_START
     or a0, a0, a1
 final:

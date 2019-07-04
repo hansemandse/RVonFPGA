@@ -51,9 +51,9 @@ end pipeline;
 architecture rtl of pipeline is
     attribute max_fanout : integer;
     -- Declarations for the register control signals
-    type alu_op_t is (ALU_AND, ALU_OR, ALU_XOR, ALU_ADD, ALU_SUB, ALU_SLT, ALU_SLTU,
-                      ALU_SLL, ALU_SRL, ALU_SRA, ALU_ADDW, ALU_SUBW, ALU_SLLW, 
-                      ALU_SRLW, ALU_SRAW, ALU_NOP);
+    type alu_op_t is (ALU_AND, ALU_OR, ALU_XOR, ALU_ADD, ALU_SUB, ALU_SLT,
+                      ALU_SLTU, ALU_SLL, ALU_SRL, ALU_SRA, ALU_ADDW,
+                      ALU_SUBW, ALU_SLLW, ALU_SRLW, ALU_SRAW, ALU_NOP);
     type branch_t is (BR_J, BR_JR, BR_EQ, BR_NE, BR_LT, BR_LTU, BR_GE, BR_GEU, BR_NOP);
     type wb_t is (WB_RES, WB_MEM, WB_PCp4);
     type flush_t is (FLUSH_NONE, FLUSH_IDEX, FLUSH_BOTH);

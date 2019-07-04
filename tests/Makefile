@@ -26,6 +26,7 @@ srec_ot := --output-target srec
 
 SRC := $(wildcard elf_tests/*.c)
 OBJS := $(SRC:.c=.o)
+SRECOBJS := $(OBJS:.o=.srec)
 
 SSRC := $(wildcard s_tests/*.s) $(wildcard s_tests_no_f/*.s)
 SOBJS := $(SSRC:.s=.o)
@@ -33,14 +34,18 @@ SBINS := $(SOBJS:.o=.bin)
 
 # Definition of make all
 .PHONY : all
-all : scomp sbinary comp
+all : scomp sbinary comp srec
 
 # Definition of all assembly programs to make
 comp : $(OBJS)
 %.o : %.c
 	$(CC) $(CFLAGS) $< -o $@
-	$(CC) $(CFLAGS) -S $< $@ -o $(basename $<).s
-	$(objcopy) $@ $(srec) $(basename $<).srec
+	$(CC) $(CFLAGS) -D -S $< $@ -o $(basename $<).s
+	@echo $@ successfully created
+
+srec : $(SRECOBJS)
+%.srec : %.o
+	$(objcopy) $< $(srec_ot) $@
 	@echo $@ successfully created
 
 scomp : $(SOBJS)

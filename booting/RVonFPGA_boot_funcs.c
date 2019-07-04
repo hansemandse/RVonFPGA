@@ -78,6 +78,18 @@ char read_sw_hi(void) {
     return ret;
 }
 
+void led_sw_test(void) {
+    unsigned short s = (read_sw_hi() << 8) | read_sw_lo();
+    while (1)
+        for (volatile int i = 0; i < 100; i++)
+            if (i == 0) {
+                write_led_lo(s & 0xFF);
+                write_led_hi((s >> 8) & 0xFF);
+                s++;
+            }
+    return;
+}
+
 int read_srec(void) {
     char count, checksum, type = '\0';
     int address, reccount = 0;

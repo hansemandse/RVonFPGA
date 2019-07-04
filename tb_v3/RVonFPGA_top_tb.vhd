@@ -12,7 +12,7 @@
 --              : Computer Science.
 --              : This is a testbench for the system.
 --              |
--- Revision     : 1.0   (last updated July 2, 2019)
+-- Revision     : 1.1   (last updated July 4, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -21,6 +21,7 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
+use std.textio.all;
 
 library work;
 use work.includes.all;
@@ -98,21 +99,29 @@ begin
     );
 
     stimuli : process is
+        file file_in : text open READ_MODE is "C:/Users/hansj/Dropbox/DTU/6. semester/Bachelorprojekt/Source files/tests/elf_tests/test.srec";
+        variable c_line : line;
+        variable c_char : character := NUL;
     begin
         -- Defaulting signal values
-        data_in_stb <= '0'; sw <= (others => '0'); data_in <= (others => '0');
+        data_in_stb <= '0'; sw <= (others => '0'); data_in <= (others => '0'); sw <= (8 => '1', others => '0');
         -- Reset the system before running it
         reset <= '1';
         for i in 0 to 4 loop
             wait until falling_edge(clk);
         end loop;
         reset <= '0';
-        -- Run the processor for some clock cycles
-        while (true) loop
-            wait until falling_edge(clk);
-            if (data_out_stb = '1') then
-                report "Received " & integer'image(to_integer(unsigned(data_out)));
-            end if;
+        -- Write all of the characters to the UART until they have all been read by the processor
+        while (not endfile(file_in)) loop
+            readline(file_in, c_line);
+            while (c_line'length > 0) loop
+                read(c_line, c_char);
+                data_in_stb <= '1'; data_in <= std_logic_vector(to_unsigned(character'pos(c_char), BYTE_WIDTH));
+                while (data_in_ack = '0') loop
+                    wait until falling_edge(clk);
+                end loop;
+                wait until falling_edge(clk);
+            end loop;
         end loop;
         std.env.stop(0);
     end process stimuli;
