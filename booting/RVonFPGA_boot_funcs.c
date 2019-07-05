@@ -33,55 +33,65 @@
 
 char uart_stb_in(void) {
     char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_IN_ADDR));
+    asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_IN_ADDR));
     return ret;
 }
 
 char uart_stb_out(void) {
     char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_OUT_ADDR));
+    asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_OUT_ADDR));
     return ret;
 }
 
 char read_uart(void) {
     char ret;
     // If data is not ready, spin on the ready register
-    while (!uart_stb_in()) {}
+    do {
+        asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_STB_IN_ADDR));
+    } while (!ret);
     // New data was available; read it into the variable ret
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_DATA_ADDR));
+    asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (UART_DATA_ADDR));
     return ret;
 }
 
 void write_uart(char val) {
     // Write the argument to the UART data register address
-    asm("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (UART_DATA_ADDR));
+    asm volatile("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (UART_DATA_ADDR));
     return;
 }
 
 void write_led_lo(char val) {
-    asm("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (LED_LO_ADDR));
+    asm volatile("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (LED_LO_ADDR));
     return;
 }
 void write_led_hi(char val) {
-    asm("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (LED_HI_ADDR));
+    asm volatile("sb %[some], 0(%[some2])" : : [some]"r" (val), [some2]"r" (LED_HI_ADDR));
     return;
 }
 
 char read_sw_lo(void) {
     char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (SW_LO_ADDR));
+    asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (SW_LO_ADDR));
     return ret;
 }
 char read_sw_hi(void) {
     char ret;
-    asm("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (SW_HI_ADDR));
+    asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (ret) : [some2]"r" (SW_HI_ADDR));
     return ret;
 }
 
-void led_sw_test(void) {
+void led_sw_uart_test(void) {
+    char str[16] = "This is RISC-V!";
+    char stb;
+    for (int i = 0; i < 15; i++) {
+        do {
+            asm volatile("lb %[some], 0(%[some2])" : [some]"=r" (stb) : [some2]"r" (UART_STB_OUT_ADDR));
+        } while (stb);
+        write_uart(str[i]);
+    }
     unsigned short s = (read_sw_hi() << 8) | read_sw_lo();
     while (1)
-        for (volatile int i = 0; i < 100; i++)
+        for (volatile int i = 0; i < 100000; i++)
             if (i == 0) {
                 write_led_lo(s & 0xFF);
                 write_led_hi((s >> 8) & 0xFF);
@@ -154,7 +164,7 @@ int read_srec(void) {
                 break;
             case '5':   // (Optional) count record
                 // The record count should match the number of (S1, S2 or S3) records handled so far
-                if (reccount - 1 != (array[0] + array[1])) {return 3;}
+                if (reccount - 1 != (array[0] + array[1])) {return -1;}
                 break;
             // Termination records contain only the start address for executing the program
             // contained in the SREC file - this is why it is set globally allowing jumps

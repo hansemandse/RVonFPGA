@@ -20,7 +20,7 @@
 march := -march=rv64i # compile for RV64I ISA
 mabi := -mabi=lp64 # define long as 64 bits, int as 32 bits, short as 16 bits and char as 8 bits
 CC := riscv64-unknown-elf-gcc
-CFLAGS := $(march) $(mabi) -c # files are compiled but not linked (output files should be OK)
+CFLAGS := $(march) $(mabi) -c
 objcopy := riscv64-unknown-elf-objcopy
 srec_ot := --output-target srec
 
@@ -39,7 +39,7 @@ all : scomp sbinary comp srec
 # Definition of all assembly programs to make
 comp : $(OBJS)
 %.o : %.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) -fpic -O3 $< -o $@
 	$(CC) $(CFLAGS) -D -S $< $@ -o $(basename $<).s
 	@echo $@ successfully created
 
@@ -50,7 +50,7 @@ srec : $(SRECOBJS)
 
 scomp : $(SOBJS)
 %.o : %.s
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 	@echo $@ successfully created
 
 sbinary : $(SBINS)

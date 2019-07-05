@@ -118,11 +118,15 @@ begin
                 read(c_line, c_char);
                 data_in_stb <= '1'; data_in <= std_logic_vector(to_unsigned(character'pos(c_char), BYTE_WIDTH));
                 while (data_in_ack = '0') loop
+                    if (data_out_stb = '1') then
+                        report "Received " & character'val(to_integer(unsigned(data_out)));
+                    end if;
                     wait until falling_edge(clk);
                 end loop;
                 wait until falling_edge(clk);
             end loop;
         end loop;
+        data_in_stb <= '0';
         std.env.stop(0);
     end process stimuli;
 
