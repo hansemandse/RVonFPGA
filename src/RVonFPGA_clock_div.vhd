@@ -1,21 +1,23 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
---              : This entity represents the clock divider of the system. It is implemented
---              : using a Xilinx PLLE2_BASE primitive.
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in 
+--              : cooperation with the Institute of Mathematics and 
+--              : Computer Science.
+--              : This entity represents the clock divider of the system. 
+--              : It is implemented using a Xilinx PLLE2_BASE primitive.
 --              |
 -- Revision     : 1.0   (last updated March 15, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -36,7 +38,7 @@ end clock_divider;
 architecture rtl of clock_divider is
     -- Multiplier for the clock divider
     constant MULT : natural := 8;
-    constant DIV_S : natural := MULT * DIV;
+    constant DIV_S : natural := MULT * DIV + 1;
 
     -- Signal for clock feedback to the PLL
     signal clk_fb : std_logic;

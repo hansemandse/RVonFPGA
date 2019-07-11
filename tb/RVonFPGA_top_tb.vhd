@@ -119,7 +119,7 @@ begin
                 data_in_stb <= '1'; data_in <= std_logic_vector(to_unsigned(character'pos(c_char), BYTE_WIDTH));
                 while (data_in_ack = '0') loop
                     if (data_out_stb = '1') then
-                        report "Received " & character'val(to_integer(unsigned(data_out)));
+                        report "Received " & integer'image(to_integer(unsigned(data_in)));
                     end if;
                     wait until falling_edge(clk);
                 end loop;

@@ -2,14 +2,4 @@
 c_tests/*.s
 *.o
 /.vscode
-serial/*.spec
-serial/__pycache__
-serial/build
-serial/dist
-serial/test.py
-*.exe
 *.srec
-src_v2/RVonFPGA_memory_noaddr.vhd
-src_32
-src_no_forwarding
-timing

@@ -1,10 +1,10 @@
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------
 -- UART
 -- Implements a universal asynchronous receiver transmitter
 -- Implemented by Peter Bennett
--- Source: https://github.com/pabennett/uart/tree/ba6d1c3a7acbec274282c59af11dae64eaec2618 
+-- Source: https://github.com/pabennett/uart/tree/master
 -- License: Apache License, Version 2.0
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------
 --Copyright 2015 Peter Bennett
 --
 --Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,7 @@
 --WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 --See the License for the specific language governing permissions and
 --limitations under the License.
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------
 -- clock
 --      Input clock, must match frequency value given on clock_frequency
 --      generic input.
@@ -34,13 +34,13 @@
 -- data_stream_out
 --      Data output port for received bytes.
 -- data_stream_out_stb
---      Output strobe to qualify the received byte. Will be valid for one clock
---      cycle only. 
+--      Output strobe to qualify the received byte. Will be valid for one 
+--      clock cycle only. 
 -- tx
 --      Serial transmit.
 -- rx
 --      Serial receive
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------
 library ieee;
     use ieee.std_logic_1164.all;
     use ieee.numeric_std.all;
@@ -65,27 +65,27 @@ entity uart is
 end uart;
 
 architecture rtl of uart is
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- Baud generation constants
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     constant c_tx_div       : integer := clock_frequency / baud;
     constant c_rx_div       : integer := clock_frequency / (baud * 16);
     constant c_tx_div_width : integer 
         := integer(log2(real(c_tx_div))) + 1;   
     constant c_rx_div_width : integer 
         := integer(log2(real(c_rx_div))) + 1;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- Baud generation signals
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     signal tx_baud_counter : unsigned(c_tx_div_width - 1 downto 0) 
         := (others => '0');   
     signal tx_baud_tick : std_logic := '0';
     signal rx_baud_counter : unsigned(c_rx_div_width - 1 downto 0) 
         := (others => '0');   
     signal rx_baud_tick : std_logic := '0';
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- Transmitter signals
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     type uart_tx_states is ( 
         tx_send_start_bit,
         tx_send_data,
@@ -96,9 +96,9 @@ architecture rtl of uart is
     signal uart_tx_data : std_logic := '1';
     signal uart_tx_count : unsigned(2 downto 0) := (others => '0');
     signal uart_rx_data_in_ack : std_logic := '0';
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- Receiver signals
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     type uart_rx_states is ( 
         rx_get_start_bit, 
         rx_get_data, 
@@ -119,10 +119,10 @@ begin
     data_stream_out     <= uart_rx_data_vec;
     data_stream_out_stb <= uart_rx_data_out_stb;
     tx                  <= uart_tx_data;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- OVERSAMPLE_CLOCK_DIVIDER
     -- generate an oversampled tick (baud * 16)
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     oversample_clock_divider : process (clock)
     begin
         if rising_edge (clock) then
@@ -140,10 +140,10 @@ begin
             end if;
         end if;
     end process oversample_clock_divider;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- RXD_SYNCHRONISE
     -- Synchronise rxd to the oversampled baud
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     rxd_synchronise : process(clock)
     begin
         if rising_edge(clock) then
@@ -157,10 +157,10 @@ begin
             end if;
         end if;
     end process rxd_synchronise;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- RXD_FILTER
     -- Filter rxd with a 2 bit counter.
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     rxd_filter : process(clock)
     begin
         if rising_edge(clock) then
@@ -185,9 +185,9 @@ begin
             end if;
         end if;
     end process rxd_filter;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- RX_BIT_SPACING
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     rx_bit_spacing : process (clock)
     begin
         if rising_edge(clock) then
@@ -205,9 +205,9 @@ begin
             end if;
         end if;
     end process rx_bit_spacing;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- UART_RECEIVE_DATA
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     uart_receive_data   : process(clock)
     begin
         if rising_edge(clock) then
@@ -252,11 +252,11 @@ begin
             end if;
         end if;
     end process uart_receive_data;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- TX_CLOCK_DIVIDER
     -- Generate baud ticks at the required rate based on the input clock
     -- frequency and baud rate
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     tx_clock_divider : process (clock)
     begin
         if rising_edge (clock) then
@@ -274,12 +274,12 @@ begin
             end if;
         end if;
     end process tx_clock_divider;
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     -- UART_SEND_DATA 
-    -- Get data from data_stream_in and send it one bit at a time upon each 
-    -- baud tick. Send data lsb first.
+    -- Get data from data_stream_in and send it one bit at a time upon  
+    -- each baud tick. Send data lsb first.
     -- wait 1 tick, send start bit (0), send data 0-7, send stop bit (1)
-    ---------------------------------------------------------------------------
+    ----------------------------------------------------------------------
     uart_send_data : process(clock)
     begin
         if rising_edge(clock) then
