@@ -1,7 +1,10 @@
-sourceFile = "boot.bin"
-resultFile = "../src_v3/RVonFPGA_rom_gen.vhd"
+from datetime import date
+today = date.today()
 
-header = """-- ***********************************************************************
+sourceFile = "boot.bin"
+resultFile = "../src/RVonFPGA_rom_gen.vhd"
+
+header1 = """-- ***********************************************************************
 --              |
 -- Title        : Implementation and Optimization of a RISC-V Processor on
 --              : a FPGA
@@ -16,7 +19,8 @@ header = """-- *****************************************************************
 --              : This entity is a generated ROM containing the bootloader
 --              : from the compiler.
 --              |
--- Revision     : 1.0   (last updated June 28, 2019)
+-- Revision     : 1.0   (last updated """
+header2 = """)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
@@ -58,7 +62,9 @@ end rtl;
 
 try:
     with open(resultFile, 'w') as f:
-        f.write(header)
+        f.write(header1)
+        f.write(today.strftime("%B %d, %Y"))
+        f.write(header2)
         with open(sourceFile, 'rb') as f1:
             fileContent = bytearray(f1.read())
             diff = 4096 - len(fileContent)

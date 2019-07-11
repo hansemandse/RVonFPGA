@@ -13,7 +13,7 @@
 --              : This entity is a generated ROM containing the bootloader
 --              : from the compiler.
 --              |
--- Revision     : 1.0   (last updated June 28, 2019)
+-- Revision     : 1.0   (last updated July 11, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |

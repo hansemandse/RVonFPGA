@@ -1,20 +1,22 @@
--- *******************************************************************************************
+-- ***********************************************************************
 --              |
--- Title        : Implementation and Optimization of a RISC-V Processor on a FPGA
+-- Title        : Implementation and Optimization of a RISC-V Processor on
+--              : a FPGA
 --              |
 -- Developers   : Hans Jakob Damsgaard, Technical University of Denmark
 --              : s163915@student.dtu.dk or hansjakobdamsgaard@gmail.com
 --              |
--- Purpose      : This file is a part of a full system implemented as part of a bachelor's
---              : thesis at DTU. The thesis is written in cooperation with the Institute
---              : of Mathematics and Computer Science.
+-- Purpose      : This file is a part of a full system implemented as part
+--              : of a bachelor's thesis at DTU. The thesis is written in
+--              : cooperation with the Institute of Mathematics and
+--              : Computer Science.
 --              : This entity represents the memory manager.
 --              |
--- Revision     : 2.0   (last updated July 2, 2019)
+-- Revision     : 2.0   (last updated July 11, 2019)
 --              |
 -- Available at : https://github.com/hansemandse/RVonFPGA
 --              |
--- *******************************************************************************************
+-- ***********************************************************************
 
 library IEEE;
 use IEEE.std_logic_1164.all;
